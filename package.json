@@ -1,0 +1,14 @@
+{
+  "name": "carlocation",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm --filter @carlocation/web dev",
+    "build": "pnpm --filter @carlocation/web build",
+    "lint": "pnpm --filter @carlocation/web lint",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,js,jsx,json,css}\""
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": []
+  }
+}
