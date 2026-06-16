@@ -22,7 +22,7 @@ export const rentalSchema = z
       }, "تاريخ البداية لا يمكن أن يكون في الماضي"),
     endDate: z.string().min(1, "تاريخ النهاية مطلوب"),
     dailyRate: z.coerce.number().min(0).optional(),
-    discountPercent: z.coerce.number().min(0).max(100).optional(),
+    discountPercent: z.coerce.number().min(0).max(50, "الحد الأقصى للتخفيض 50%").optional(),
     discountReason: z.string().optional(),
     depositAmount: z.coerce.number().min(0).optional(),
     notes: z.string().optional(),

@@ -293,6 +293,12 @@ export default function MaintenancePage() {
         vendor_phone: data.vendorPhone || null,
       } as any);
       if (error) throw new Error(error.message);
+
+      // Update car status to maintenance
+      await (supabase
+        .from("cars") as any)
+        .update({ status: "maintenance" })
+        .eq("id", data.carId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["maintenance"] });
@@ -306,11 +312,29 @@ export default function MaintenancePage() {
 
   const completeMutation = useMutation({
     mutationFn: async (id: string) => {
+      const record = records?.find((r) => r.id === id);
       const { error } = await (supabase
         .from("maintenance") as any)
         .update({ status: "completed", completed_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw new Error(error.message);
+
+      // Check if car has other active maintenance
+      if (record?.carId) {
+        const { count: otherActive } = await supabase
+          .from("maintenance")
+          .select("id", { count: "exact", head: true })
+          .eq("car_id", record.carId)
+          .in("status", ["pending", "in_progress"])
+          .neq("id", id);
+
+        if ((otherActive ?? 0) === 0) {
+          await (supabase
+            .from("cars") as any)
+            .update({ status: "available" })
+            .eq("id", record.carId);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["maintenance"] });
@@ -324,11 +348,20 @@ export default function MaintenancePage() {
 
   const startMutation = useMutation({
     mutationFn: async (id: string) => {
+      const record = records?.find((r) => r.id === id);
       const { error } = await (supabase
         .from("maintenance") as any)
         .update({ status: "in_progress" })
         .eq("id", id);
       if (error) throw new Error(error.message);
+
+      // Update car status to maintenance
+      if (record?.carId) {
+        await (supabase
+          .from("cars") as any)
+          .update({ status: "maintenance" })
+          .eq("id", record.carId);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["maintenance"] });
@@ -340,11 +373,29 @@ export default function MaintenancePage() {
 
   const cancelMutation = useMutation({
     mutationFn: async (id: string) => {
+      const record = records?.find((r) => r.id === id);
       const { error } = await (supabase
         .from("maintenance") as any)
         .update({ status: "cancelled" })
         .eq("id", id);
       if (error) throw new Error(error.message);
+
+      // Check if car has other active maintenance
+      if (record?.carId) {
+        const { count: otherActive } = await supabase
+          .from("maintenance")
+          .select("id", { count: "exact", head: true })
+          .eq("car_id", record.carId)
+          .in("status", ["pending", "in_progress"])
+          .neq("id", id);
+
+        if ((otherActive ?? 0) === 0) {
+          await (supabase
+            .from("cars") as any)
+            .update({ status: "available" })
+            .eq("id", record.carId);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["maintenance"] });

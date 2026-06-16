@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { mapCustomer, toCustomerInsert, toCustomerUpdate, type Customer } from "@/lib/mappers";
+import { useRole } from "@/hooks/use-role";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { SortHeader } from "@/components/shared/sort-header";
@@ -20,6 +21,7 @@ import {
   X,
   Eye,
   AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 import { useForm } from "react-hook-form";
@@ -262,6 +264,7 @@ function CustomerForm({
 }
 
 export default function CustomersPage() {
+  const { isManager } = useRole();
   const [addOpen, setAddOpen] = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
   const [deleteCustomer, setDeleteCustomer] = useState<Customer | null>(null);
@@ -404,6 +407,21 @@ export default function CustomersPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const reEnableMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("customers")
+        .update({ blacklisted: false, blacklist_reason: null } as never)
+        .eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      toast.success("تم إعادة تنشيط العميل بنجاح");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const handleExport = () => {
     const exportData = sorted.map((c) => ({
       firstName: c.firstName,
@@ -451,10 +469,12 @@ export default function CustomersPage() {
             <Download className="w-4 h-4" />
             تصدير CSV
           </Button>
-          <Button onClick={() => setAddOpen(true)} variant="primary">
-            <Plus className="w-4 h-4" />
-            إضافة عميل
-          </Button>
+          {isManager && (
+            <Button onClick={() => setAddOpen(true)} variant="primary">
+              <Plus className="w-4 h-4" />
+              إضافة عميل
+            </Button>
+          )}
         </div>
       </div>
 
@@ -583,20 +603,35 @@ export default function CustomersPage() {
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <Button
-                            onClick={() => setEditCustomer(c)}
-                            variant="ghost"
-                            size="icon"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            onClick={() => setDeleteCustomer(c)}
-                            variant="ghost"
-                            size="icon"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          {isManager && (
+                            <>
+                              <Button
+                                onClick={() => setEditCustomer(c)}
+                                variant="ghost"
+                                size="icon"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              {c.blacklisted ? (
+                                <Button
+                                  onClick={() => reEnableMutation.mutate(c.id)}
+                                  variant="ghost"
+                                  size="icon"
+                                  title="إعادة التنشيط"
+                                >
+                                  <RotateCcw className="w-4 h-4 text-success" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  onClick={() => setDeleteCustomer(c)}
+                                  variant="ghost"
+                                  size="icon"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

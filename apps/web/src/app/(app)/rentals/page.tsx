@@ -51,6 +51,14 @@ export default function RentalsPage() {
   } = useQuery({
     queryKey: ["rentals"],
     queryFn: async () => {
+      // Auto-detect overdue rentals
+      const now = new Date().toISOString();
+      await (supabase
+        .from("rentals") as any)
+        .update({ status: "overdue" })
+        .eq("status", "active")
+        .lt("end_date", now);
+
       const { data, error } = await supabase
         .from("rentals")
         .select("*, customer:customers(*), car:cars(*)")
@@ -140,6 +148,19 @@ export default function RentalsPage() {
 
   const addMutation = useMutation({
     mutationFn: async (data: RentalFormData) => {
+      // Check for date overlap on the same car
+      const { data: overlapping, count: overlapCount } = await supabase
+        .from("rentals")
+        .select("id", { count: "exact", head: true })
+        .eq("car_id", data.carId)
+        .in("status", ["active", "overdue", "reserved"])
+        .lt("start_date", data.endDate)
+        .gt("end_date", data.startDate);
+
+      if ((overlapCount ?? 0) > 0) {
+        throw new Error("السيارة محجوزة في هذه الفترة بالفعل");
+      }
+
       const selectedCar = availableCars?.find((c) => c.id === data.carId);
       const dailyRate = (data.dailyRate as number) || selectedCar?.dailyRate || 0;
       const discount = (data.discountPercent as number) || 0;

@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { mapCar, toCarInsert, toCarUpdate, type Car } from "@/lib/mappers";
+import { useRole } from "@/hooks/use-role";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -296,6 +297,7 @@ function CarForm({
 }
 
 export default function FleetPage() {
+  const { isManager } = useRole();
   const [addOpen, setAddOpen] = useState(false);
   const [editCar, setEditCar] = useState<Car | null>(null);
   const [deleteCar, setDeleteCar] = useState<Car | null>(null);
@@ -405,15 +407,43 @@ export default function FleetPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("cars")
-        .update({ status: "out_of_service" } as never)
-        .eq("id", id);
+      // Check for active rentals
+      const { data: activeRentals, count } = await supabase
+        .from("rentals")
+        .select("id", { count: "exact", head: true })
+        .eq("car_id", id)
+        .in("status", ["active", "overdue", "reserved"]);
+
+      if ((count ?? 0) > 0) {
+        throw new Error("لا يمكن حذف السيارة — هناك كراءات نشطة أو متأخرة أو محجوزة عليها");
+      }
+
+      // Check for pending/in_progress maintenance
+      const { count: maintCount } = await supabase
+        .from("maintenance")
+        .select("id", { count: "exact", head: true })
+        .eq("car_id", id)
+        .in("status", ["pending", "in_progress"]);
+
+      if ((maintCount ?? 0) > 0) {
+        throw new Error("لا يمكن حذف السيارة — هناك صيانة نشطة عليها");
+      }
+
+      // Delete related records first (completed rentals, tracking, maintenance)
+      await supabase.from("tracking").delete().eq("car_id", id);
+      await supabase.from("rentals").delete().eq("car_id", id);
+      await supabase.from("maintenance").delete().eq("car_id", id);
+
+      // Delete the car
+      const { error } = await supabase.from("cars").delete().eq("id", id);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cars"] });
-      toast.success("تم تعطيل السيارة بنجاح");
+      queryClient.invalidateQueries({ queryKey: ["rentals"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+      toast.success("تم حذف السيارة بنجاح");
       setDeleteCar(null);
     },
     onError: (err: Error) => toast.error(err.message),
@@ -471,13 +501,15 @@ export default function FleetPage() {
           >
             تصدير CSV
           </Button>
-          <Button
-            size="md"
-            iconLeft={<Plus />}
-            onClick={() => setAddOpen(true)}
-          >
-            إضافة سيارة
-          </Button>
+          {isManager && (
+            <Button
+              size="md"
+              iconLeft={<Plus />}
+              onClick={() => setAddOpen(true)}
+            >
+              إضافة سيارة
+            </Button>
+          )}
         </div>
       </div>
 
@@ -727,18 +759,22 @@ export default function FleetPage() {
                     >
                       <Eye className="w-3 h-3" /> تفاصيل
                     </button>
-                    <button
-                      onClick={() => setEditCar(car)}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all"
-                    >
-                      <Pencil className="w-3 h-3" /> تعديل
-                    </button>
-                    <button
-                      onClick={() => setDeleteCar(car)}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 transition-all"
-                    >
-                      <Trash2 className="w-3 h-3" /> حذف
-                    </button>
+                    {isManager && (
+                      <>
+                        <button
+                          onClick={() => setEditCar(car)}
+                          className="flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+                        >
+                          <Pencil className="w-3 h-3" /> تعديل
+                        </button>
+                        <button
+                          onClick={() => setDeleteCar(car)}
+                          className="flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 transition-all"
+                        >
+                          <Trash2 className="w-3 h-3" /> حذف
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -810,6 +846,10 @@ export default function FleetPage() {
               {deleteCar?.brand} {deleteCar?.model}
             </strong>
             ؟
+          </p>
+          <p className="text-xs text-warning bg-warning/10 p-3 rounded-lg">
+            سيتم حذف السيارة وجميع البيانات المرتبطة بها (كراءات مكتملة، سجلات صيانة، تتبع) بشكل نهائي.
+            لن يتم الحذف إذا كانت السيارة بها كراءات نشطة أو صيانة جارية.
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setDeleteCar(null)}>

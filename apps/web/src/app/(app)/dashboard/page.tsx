@@ -190,7 +190,7 @@ export default function DashboardPage() {
     queryFn: async () => {
       const [carsRes, rentalsRes, customersRes, maintenanceRes] = await Promise.all([
         supabase.from("cars").select("status").returns<{ status: string }[]>(),
-        supabase.from("rentals").select("status, total_amount, start_date, end_date").returns<{ status: string; total_amount: number | null; start_date: string; end_date: string }[]>(),
+        supabase.from("rentals").select("status, total_amount, start_date, end_date, return_date").returns<{ status: string; total_amount: number | null; start_date: string; end_date: string; return_date: string | null }[]>(),
         supabase.from("customers").select("id", { count: "exact", head: true }),
         supabase.from("maintenance").select("status").in("status", ["pending", "in_progress"]).returns<{ status: string }[]>(),
       ]);
@@ -214,10 +214,10 @@ export default function DashboardPage() {
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString();
 
       const thisMonthRevenue = rentals
-        .filter((r) => r.status === "completed" && r.start_date >= monthStart)
+        .filter((r) => r.status === "completed" && r.return_date && r.return_date >= monthStart)
         .reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
       const lastMonthRevenue = rentals
-        .filter((r) => r.status === "completed" && r.start_date >= lastMonthStart && r.start_date <= lastMonthEnd)
+        .filter((r) => r.status === "completed" && r.return_date && r.return_date >= lastMonthStart && r.return_date <= lastMonthEnd)
         .reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
       const monthlyRevenueChange = lastMonthRevenue > 0
         ? Math.round(((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
@@ -225,7 +225,7 @@ export default function DashboardPage() {
 
       const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
       const totalRevenueYTD = rentals
-        .filter((r) => r.status === "completed" && r.start_date >= yearStart)
+        .filter((r) => r.status === "completed" && r.return_date && r.return_date >= yearStart)
         .reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
 
       return {
@@ -250,10 +250,11 @@ export default function DashboardPage() {
     queryFn: async () => {
       const { data: rows, error } = await supabase
         .from("rentals")
-        .select("total_amount, start_date")
+        .select("total_amount, return_date")
         .eq("status", "completed")
-        .order("start_date", { ascending: false })
-        .returns<{ total_amount: number | null; start_date: string }[]>();
+        .not("return_date", "is", null)
+        .order("return_date", { ascending: false })
+        .returns<{ total_amount: number | null; return_date: string }[]>();
       if (error) throw new Error(error.message);
 
       const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
@@ -264,8 +265,8 @@ export default function DashboardPage() {
         const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0);
         const revenue = (rows ?? [])
           .filter((r) => {
-            const sd = new Date(r.start_date);
-            return sd >= d && sd <= monthEnd;
+            const rd = new Date(r.return_date);
+            return rd >= d && rd <= monthEnd;
           })
           .reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
         months.push({ month: monthNames[d.getMonth()], revenue });
