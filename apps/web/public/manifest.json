@@ -1,0 +1,33 @@
+{
+  "name": "CarLocation - منصة كراء السيارات",
+  "short_name": "CarLocation",
+  "description": "نظام إدارة تأجير السيارات",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#22c55e",
+  "orientation": "portrait-primary",
+  "dir": "rtl",
+  "lang": "ar",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "لوحة التحكم",
+      "short_name": "التحكم",
+      "url": "/dashboard"
+    },
+    {
+      "name": "التأجيرات",
+      "short_name": "التأجير",
+      "url": "/rentals"
+    }
+  ]
+}

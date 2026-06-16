@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Cairo } from "next/font/google";
 import { Providers } from "@/components/providers";
@@ -23,7 +23,24 @@ const cairo = Cairo({
 
 export const metadata: Metadata = {
   title: "CarLocation - منصة كراء السيارات",
-  description: "نظام إدارة كراء السيارات الداخلي",
+  description: "نظام إدارة كراء السيارات",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "CarLocation",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 const themeScript = `
@@ -45,6 +62,18 @@ const themeScript = `
 })();
 `;
 
+const swScript = `
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').then(function(reg) {
+      console.log('SW registered:', reg.scope);
+    }).catch(function(err) {
+      console.log('SW registration failed:', err);
+    });
+  });
+}
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -59,6 +88,8 @@ export default function RootLayout({
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: swScript }} />
+        <link rel="apple-touch-icon" href="/icons/icon.svg" />
       </head>
       <body className="min-h-full bg-background text-foreground">
         <Providers>{children}</Providers>
