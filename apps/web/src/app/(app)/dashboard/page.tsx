@@ -252,9 +252,8 @@ export default function DashboardPage() {
         .from("rentals")
         .select("total_amount, return_date")
         .eq("status", "completed")
-        .not("return_date", "is", null)
         .order("return_date", { ascending: false })
-        .returns<{ total_amount: number | null; return_date: string }[]>();
+        .returns<{ total_amount: number | null; return_date: string | null }[]>();
       if (error) throw new Error(error.message);
 
       const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
@@ -265,6 +264,7 @@ export default function DashboardPage() {
         const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0);
         const revenue = (rows ?? [])
           .filter((r) => {
+            if (!r.return_date) return false;
             const rd = new Date(r.return_date);
             return rd >= d && rd <= monthEnd;
           })
