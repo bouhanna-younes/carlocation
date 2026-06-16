@@ -22,6 +22,7 @@ import {
   Eye,
   AlertTriangle,
   RotateCcw,
+  Ban,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 import { useForm } from "react-hook-form";
@@ -268,6 +269,7 @@ export default function CustomersPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
   const [deleteCustomer, setDeleteCustomer] = useState<Customer | null>(null);
+  const [disableCustomer, setDisableCustomer] = useState<Customer | null>(null);
   const [viewCustomer, setViewCustomer] = useState<Customer | null>(null);
   const queryClient = useQueryClient();
 
@@ -391,17 +393,46 @@ export default function CustomersPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const deleteMutation = useMutation({
+  const disableMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("customers")
-        .update({ blacklisted: true, blacklist_reason: "تم الحذف/التعطيل" } as never)
+        .update({ blacklisted: true, blacklist_reason: "تم التعطيل يدوياً" } as never)
         .eq("id", id);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       toast.success("تم تعطيل العميل بنجاح");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Check for active rentals
+      const { count } = await supabase
+        .from("rentals")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", id)
+        .in("status", ["active", "overdue", "reserved"]);
+
+      if ((count ?? 0) > 0) {
+        throw new Error("لا يمكن حذف العميل — لديه كراءات نشطة");
+      }
+
+      // Delete all completed/cancelled rentals for this customer
+      await supabase.from("rentals").delete().eq("customer_id", id);
+
+      // Delete the customer
+      const { error } = await supabase.from("customers").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["rentals"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+      toast.success("تم حذف العميل بنجاح");
       setDeleteCustomer(null);
     },
     onError: (err: Error) => toast.error(err.message),
@@ -622,13 +653,24 @@ export default function CustomersPage() {
                                   <RotateCcw className="w-4 h-4 text-success" />
                                 </Button>
                               ) : (
-                                <Button
-                                  onClick={() => setDeleteCustomer(c)}
-                                  variant="ghost"
-                                  size="icon"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <>
+                                  <Button
+                                    onClick={() => setDisableCustomer(c)}
+                                    variant="ghost"
+                                    size="icon"
+                                    title="تعطيل العميل"
+                                  >
+                                    <Ban className="w-4 h-4 text-warning" />
+                                  </Button>
+                                  <Button
+                                    onClick={() => setDeleteCustomer(c)}
+                                    variant="ghost"
+                                    size="icon"
+                                    title="حذف العميل"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
                               )}
                             </>
                           )}
@@ -776,6 +818,9 @@ export default function CustomersPage() {
             </strong>
             ؟
           </p>
+          <p className="text-xs text-danger bg-danger/10 p-3 rounded-lg">
+            سيتم حذف العميل وجميع بياناته بشكل نهائي. لن يتم الحذف إذا كان لدى العميل كراءات نشطة.
+          </p>
           <div className="flex justify-end gap-2">
             <Button onClick={() => setDeleteCustomer(null)} variant="outline">
               إلغاء
@@ -788,6 +833,42 @@ export default function CustomersPage() {
               variant="danger"
             >
               {deleteMutation.isPending ? "جاري الحذف..." : "حذف"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!disableCustomer}
+        onOpenChange={(open) => {
+          if (!open) setDisableCustomer(null);
+        }}
+        title="تعطيل العميل"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            هل أنت متأكد من تعطيل العميل{" "}
+            <strong className="text-foreground">
+              {disableCustomer?.firstName} {disableCustomer?.lastName}
+            </strong>
+            ؟
+          </p>
+          <p className="text-xs text-warning bg-warning/10 p-3 rounded-lg">
+            سيتم تعطيل العميل ولن يتمكن من إنشاء كراءات جديدة حتى يتم إعادة تنشيطه.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => setDisableCustomer(null)} variant="outline">
+              إلغاء
+            </Button>
+            <Button
+              onClick={() => {
+                if (disableCustomer) disableMutation.mutate(disableCustomer.id);
+                setDisableCustomer(null);
+              }}
+              disabled={disableMutation.isPending}
+              variant="warning"
+            >
+              {disableMutation.isPending ? "جاري التعطيل..." : "تعطيل"}
             </Button>
           </div>
         </div>

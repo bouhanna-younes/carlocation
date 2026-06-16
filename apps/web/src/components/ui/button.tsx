@@ -15,6 +15,8 @@ const buttonVariants = cva(
           "bg-gradient-to-br from-secondary to-indigo-600 text-white hover:shadow-lg hover:shadow-secondary/30 focus:ring-secondary",
         danger:
           "bg-gradient-to-br from-danger to-red-600 text-white hover:shadow-lg hover:shadow-danger/30 focus:ring-danger",
+        warning:
+          "bg-gradient-to-br from-warning to-amber-600 text-white hover:shadow-lg hover:shadow-warning/30 focus:ring-warning",
         ghost:
           "bg-transparent text-muted hover:bg-surface-hover hover:text-foreground focus:ring-muted",
         outline:
