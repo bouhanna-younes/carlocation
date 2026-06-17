@@ -1,4 +1,4 @@
-const CACHE_NAME = "carlocation-v1";
+const CACHE_NAME = "carlocation-v2";
 const STATIC_ASSETS = [
   "/",
   "/login",
@@ -8,6 +8,7 @@ const STATIC_ASSETS = [
   "/rentals",
   "/maintenance",
   "/notifications",
+  "/invoices",
   "/reports",
   "/settings",
   "/tracking",
@@ -17,9 +18,7 @@ const STATIC_ASSETS = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch(() => {
-        // Ignore individual failures
-      });
+      return cache.addAll(STATIC_ASSETS).catch(() => {});
     }),
   );
   self.skipWaiting();
@@ -30,9 +29,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key)),
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)),
       ),
     ),
   );
@@ -42,19 +39,12 @@ self.addEventListener("activate", (event) => {
 // Fetch: network first, fallback to cache
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-
-  // Skip non-GET requests
   if (request.method !== "GET") return;
-
-  // Skip API calls (let them go to network)
-  if (request.url.includes("/api/") || request.url.includes("supabase")) {
-    return;
-  }
+  if (request.url.includes("/api/") || request.url.includes("supabase")) return;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        // Cache successful responses
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -64,15 +54,52 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() => {
-        // Fallback to cache when offline
         return caches.match(request).then((cached) => {
           if (cached) return cached;
-          // Return offline page for navigation requests
-          if (request.mode === "navigate") {
-            return caches.match("/");
-          }
+          if (request.mode === "navigate") return caches.match("/");
           return new Response("Offline", { status: 503 });
         });
       }),
+  );
+});
+
+// Push Notification Handler
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  const data = event.data.json();
+  const title = data.title || "CarLocation";
+  const options = {
+    body: data.body || "لديك تنبيه جديد",
+    icon: "/icons/icon.svg",
+    badge: "/icons/icon.svg",
+    tag: data.tag || "carlocation-notification",
+    data: data.url || "/notifications",
+    vibrate: [100, 50, 100],
+    actions: [
+      { action: "open", title: "فتح" },
+      { action: "dismiss", title: "تجاهل" },
+    ],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Notification Click Handler
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  if (event.action === "dismiss") return;
+
+  const url = event.notification.data || "/notifications";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window" }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    }),
   );
 });
