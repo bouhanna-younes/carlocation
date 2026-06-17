@@ -312,6 +312,8 @@ export interface Notification {
   message: string;
   type: string;
   isRead: boolean;
+  category: string;
+  metadata?: string;
   createdAt: string;
 }
 
@@ -322,6 +324,8 @@ export function mapNotification(row: SupabaseNotification): Notification {
     message: row.message,
     type: row.type,
     isRead: row.is_read,
+    category: (row as any).category ?? "general",
+    metadata: (row as any).metadata ?? undefined,
     createdAt: row.created_at,
   };
 }

@@ -13,12 +13,22 @@ import {
   Info,
   CheckCircle,
   AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { timeAgo } from "@/lib/utils";
 
 type FilterType = "all" | "unread" | "read";
+
+// Categories that link to a car (for expiry notifications)
+const carLinkedCategories = [
+  "insurance_expiry",
+  "vignette_expiry",
+  "inspection_expiry",
+  "oil_change_expiry",
+];
 
 const typeIconMap: Record<
   string,
@@ -50,6 +60,7 @@ function SkeletonRow() {
 }
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<FilterType>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -255,6 +266,15 @@ export default function NotificationsPage() {
                   key={n.id}
                   onClick={() => {
                     if (!n.isRead) markRead.mutate(n.id);
+                    // Navigate to fleet page with carId for expiry notifications
+                    if (carLinkedCategories.includes(n.category) && n.metadata) {
+                      try {
+                        const meta = JSON.parse(n.metadata);
+                        if (meta.carId) {
+                          router.push(`/fleet?edit=${meta.carId}`);
+                        }
+                      } catch {}
+                    }
                   }}
                   className={`flex items-start gap-4 p-4 transition-all duration-200 cursor-pointer ${
                     n.isRead
@@ -281,6 +301,12 @@ export default function NotificationsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    {carLinkedCategories.includes(n.category) && n.metadata && (
+                      <span className="flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-1 rounded-lg">
+                        <ExternalLink className="w-3 h-3" />
+                        تعديل
+                      </span>
+                    )}
                     {!n.isRead && (
                       <button
                         onClick={(e) => {

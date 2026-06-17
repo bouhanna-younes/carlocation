@@ -64,7 +64,8 @@ export async function checkExpiryDates(): Promise<number> {
           `${car.brand} ${car.model}`,
           "insurance_expiry",
           `تأمين السيارة ينتهي في ${expiryDate.toLocaleDateString("ar-DZ")}`,
-          expiryDate
+          expiryDate,
+          car.id
         );
         if (created) notificationsCreated++;
       }
@@ -78,7 +79,8 @@ export async function checkExpiryDates(): Promise<number> {
           `${car.brand} ${car.model}`,
           "oil_change_expiry",
           `تبديل الزيت للسيارة ينتهي في ${expiryDate.toLocaleDateString("ar-DZ")}`,
-          expiryDate
+          expiryDate,
+          car.id
         );
         if (created) notificationsCreated++;
       }
@@ -92,7 +94,8 @@ export async function checkExpiryDates(): Promise<number> {
           `${car.brand} ${car.model}`,
           "vignette_expiry",
           `Vignette السيارة ينتهي في ${expiryDate.toLocaleDateString("ar-DZ")}`,
-          expiryDate
+          expiryDate,
+          car.id
         );
         if (created) notificationsCreated++;
       }
@@ -106,7 +109,8 @@ export async function checkExpiryDates(): Promise<number> {
           `${car.brand} ${car.model}`,
           "inspection_expiry",
           `الفحص التقني للسيارة ينتهي في ${expiryDate.toLocaleDateString("ar-DZ")}`,
-          expiryDate
+          expiryDate,
+          car.id
         );
         if (created) notificationsCreated++;
       }
@@ -167,7 +171,8 @@ async function createExpiryNotification(
   subject: string,
   category: NotificationCategory,
   message: string,
-  expiryDate: Date
+  expiryDate: Date,
+  carId?: string
 ): Promise<boolean> {
   // Check if similar notification exists today
   const todayStart = new Date();
@@ -183,12 +188,13 @@ async function createExpiryNotification(
 
   if (existing && existing.length > 0) return false;
 
-  // Create notification
+  // Create notification with carId in metadata
   const { error } = await supabase.from("notifications").insert({
     title: `${categoryLabels[category]} — ${subject}`,
     message,
     type: "warning",
     category,
+    metadata: carId ? JSON.stringify({ carId }) : null,
   } as any);
 
   return !error;

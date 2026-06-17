@@ -17,7 +17,7 @@ import {
   X,
   Eye,
 } from "lucide-react";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -282,6 +282,15 @@ export default function FleetPage() {
   const [viewCar, setViewCar] = useState<Car | null>(null);
   const queryClient = useQueryClient();
 
+  // Check for ?edit=carId in URL
+  const [initialEditId, setInitialEditId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("edit");
+    }
+    return null;
+  });
+
   const {
     data: cars,
     isLoading,
@@ -297,6 +306,19 @@ export default function FleetPage() {
       return (data ?? []).map(mapCar);
     },
   });
+
+  // Open edit modal if ?edit=carId is in URL
+  useEffect(() => {
+    if (initialEditId && cars) {
+      const carToEdit = cars.find((c) => c.id === initialEditId);
+      if (carToEdit && isManager) {
+        setEditCar(carToEdit);
+        // Clean URL
+        window.history.replaceState({}, "", "/fleet");
+        setInitialEditId(null);
+      }
+    }
+  }, [initialEditId, cars, isManager]);
 
   const searchFn = useCallback(
     (car: Car, search: string) => {
