@@ -18,6 +18,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -274,6 +275,7 @@ function CarForm({
 }
 
 export default function FleetPage() {
+  const searchParams = useSearchParams();
   const { isManager } = useRole();
   const [addOpen, setAddOpen] = useState(false);
   const [editCar, setEditCar] = useState<Car | null>(null);
@@ -282,14 +284,8 @@ export default function FleetPage() {
   const [viewCar, setViewCar] = useState<Car | null>(null);
   const queryClient = useQueryClient();
 
-  // Check for ?edit=carId in URL
-  const [initialEditId, setInitialEditId] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("edit");
-    }
-    return null;
-  });
+  // Read edit parameter from URL
+  const editId = searchParams.get("edit");
 
   const {
     data: cars,
@@ -309,16 +305,15 @@ export default function FleetPage() {
 
   // Open edit modal if ?edit=carId is in URL
   useEffect(() => {
-    if (initialEditId && cars) {
-      const carToEdit = cars.find((c) => c.id === initialEditId);
+    if (editId && cars) {
+      const carToEdit = cars.find((c) => c.id === editId);
       if (carToEdit && isManager) {
         setEditCar(carToEdit);
-        // Clean URL
+        // Clean URL without triggering navigation
         window.history.replaceState({}, "", "/fleet");
-        setInitialEditId(null);
       }
     }
-  }, [initialEditId, cars, isManager]);
+  }, [editId, cars, isManager]);
 
   const searchFn = useCallback(
     (car: Car, search: string) => {
