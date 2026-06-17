@@ -365,10 +365,14 @@ export default function InvoicesPage() {
 
       {/* Table */}
       {isLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <SkeletonRow key={i} />
-          ))}
+        <div className="glass rounded-2xl border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <tbody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonRow key={i} />
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : sorted.length === 0 ? (
         <EmptyState icon={FileText} title="لا توجد فواتير" description="ستظهر الفواتير هنا عند إنشاء التأجيرات" />
