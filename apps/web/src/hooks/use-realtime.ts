@@ -20,7 +20,7 @@ export function useRealtime(table: string) {
           // Invalidate the table query
           queryClient.invalidateQueries({ queryKey: [table] });
 
-          // Also invalidate dashboard queries for related tables
+          // Invalidate dashboard queries for related tables
           if (["cars", "rentals", "maintenance", "customers"].includes(table)) {
             queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
             queryClient.invalidateQueries({ queryKey: ["revenue-chart"] });
@@ -28,12 +28,6 @@ export function useRealtime(table: string) {
             queryClient.invalidateQueries({ queryKey: ["upcoming-returns"] });
             queryClient.invalidateQueries({ queryKey: ["pending-maintenance"] });
             queryClient.invalidateQueries({ queryKey: ["activities"] });
-            queryClient.invalidateQueries({ queryKey: ["expiry-check"] });
-          }
-
-          // Invalidate notifications when any table changes
-          if (table !== "notifications") {
-            queryClient.invalidateQueries({ queryKey: ["notifications"] });
           }
         },
       )

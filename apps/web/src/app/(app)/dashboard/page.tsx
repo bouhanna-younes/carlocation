@@ -190,11 +190,12 @@ export default function DashboardPage() {
   useRealtime("customers");
   useRealtime("notifications");
 
-  // Check expiry dates on dashboard load
+  // Check expiry dates on dashboard load (once per hour, not on Realtime)
   const { data: expiryCount } = useQuery({
     queryKey: ["expiry-check"],
     queryFn: checkExpiryDates,
     refetchInterval: 3600000, // Check every hour
+    staleTime: 3600000, // Consider fresh for 1 hour
   });
 
   const {

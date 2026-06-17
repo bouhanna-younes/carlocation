@@ -174,16 +174,13 @@ async function createExpiryNotification(
   expiryDate: Date,
   carId?: string
 ): Promise<boolean> {
-  // Check if similar notification exists today
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
+  // Check if similar notification already exists (any time, not just today)
   const { data: existing } = await supabase
     .from("notifications")
     .select("id")
     .eq("category", category)
     .ilike("title", `%${subject}%`)
-    .gte("created_at", todayStart.toISOString())
+    .eq("is_read", false)
     .limit(1);
 
   if (existing && existing.length > 0) return false;
