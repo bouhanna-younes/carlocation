@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { useTableState } from "@/hooks/use-table-state";
 import { inputClass, rentalStatusMap } from "@/lib/constants";
 import { exportToCSV } from "@/lib/export-csv";
+import { useRealtime } from "@/hooks/use-realtime";
 import {
   RentalForm,
   editRentalSchema,
@@ -43,6 +44,11 @@ export default function RentalsPage() {
   const [cancelRental, setCancelRental] = useState<Rental | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const queryClient = useQueryClient();
+
+  // Realtime updates
+  useRealtime("rentals");
+  useRealtime("cars");
+  useRealtime("notifications");
 
   const {
     data: rentals,

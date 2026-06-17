@@ -8,6 +8,7 @@ import { useSidebar } from "@/components/layout/sidebar-context";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { useRef, useEffect, useCallback } from "react";
+import { useRealtime } from "@/hooks/use-realtime";
 import {
   LayoutDashboard,
   Car,
@@ -84,6 +85,9 @@ const navGroups: NavGroup[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+
+  // Realtime updates for notifications
+  useRealtime("notifications");
 
   // Fetch platform name from settings
   const { data: settings } = useQuery<{ platformInfo: { name?: string } }>({

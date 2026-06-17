@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { useRealtime } from "@/hooks/use-realtime";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -283,6 +284,10 @@ export default function FleetPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [viewCar, setViewCar] = useState<Car | null>(null);
   const queryClient = useQueryClient();
+
+  // Realtime updates
+  useRealtime("cars");
+  useRealtime("notifications");
 
   // Read edit and notification parameters from URL
   const editId = searchParams.get("edit");

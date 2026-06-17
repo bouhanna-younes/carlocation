@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { mapCustomer, toCustomerInsert, toCustomerUpdate, type Customer } from "@/lib/mappers";
 import { useRole } from "@/hooks/use-role";
+import { useRealtime } from "@/hooks/use-realtime";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { SortHeader } from "@/components/shared/sort-header";
@@ -272,6 +273,10 @@ export default function CustomersPage() {
   const [disableCustomer, setDisableCustomer] = useState<Customer | null>(null);
   const [viewCustomer, setViewCustomer] = useState<Customer | null>(null);
   const queryClient = useQueryClient();
+
+  // Realtime updates
+  useRealtime("customers");
+  useRealtime("notifications");
 
   const {
     data: customers,

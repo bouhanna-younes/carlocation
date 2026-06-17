@@ -35,6 +35,7 @@ import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatDZD, timeAgo, statusMap } from "@/lib/utils";
+import { useRealtime } from "@/hooks/use-realtime";
 
 interface DashboardKPIs {
   totalCars: number;
@@ -182,6 +183,13 @@ function ErrorState({ message }: { message?: string }) {
 
 /* ═══════════════ MAIN ═══════════════ */
 export default function DashboardPage() {
+  // Realtime updates
+  useRealtime("cars");
+  useRealtime("rentals");
+  useRealtime("maintenance");
+  useRealtime("customers");
+  useRealtime("notifications");
+
   // Check expiry dates on dashboard load
   const { data: expiryCount } = useQuery({
     queryKey: ["expiry-check"],

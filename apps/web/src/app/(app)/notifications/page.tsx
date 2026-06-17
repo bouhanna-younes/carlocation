@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { timeAgo } from "@/lib/utils";
+import { useRealtime } from "@/hooks/use-realtime";
 
 type FilterType = "all" | "unread" | "read";
 
@@ -64,6 +65,9 @@ export default function NotificationsPage() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<FilterType>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+
+  // Realtime updates
+  useRealtime("notifications");
 
   const {
     data: notifications,

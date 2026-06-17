@@ -33,6 +33,7 @@ import {
   priorityMap,
 } from "@/lib/constants";
 import { exportToCSV } from "@/lib/export-csv";
+import { useRealtime } from "@/hooks/use-realtime";
 
 const maintenanceSchema = z.object({
   carId: z.string().min(1, "السيارة مطلوبة"),
@@ -199,6 +200,11 @@ export default function MaintenancePage() {
   const [confirmComplete, setConfirmComplete] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const queryClient = useQueryClient();
+
+  // Realtime updates
+  useRealtime("maintenance");
+  useRealtime("cars");
+  useRealtime("notifications");
 
   const {
     data: records,

@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { useTableState } from "@/hooks/use-table-state";
 import { inputClass } from "@/lib/constants";
 import { exportToCSV } from "@/lib/export-csv";
+import { useRealtime } from "@/hooks/use-realtime";
 
 const statusMap: Record<string, { label: string; colorClass: string }> = {
   pending: { label: "معلقة", colorClass: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
@@ -172,6 +173,10 @@ export default function InvoicesPage() {
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const queryClient = useQueryClient();
+
+  // Realtime updates
+  useRealtime("invoices");
+  useRealtime("notifications");
 
   const {
     data: invoices,

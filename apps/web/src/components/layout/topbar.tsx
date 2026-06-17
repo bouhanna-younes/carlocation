@@ -19,9 +19,13 @@ import { useRef, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { Notification } from "@/lib/mappers";
+import { useRealtime } from "@/hooks/use-realtime";
 
 export function Topbar() {
   const { user, logout } = useAuth();
+
+  // Realtime updates for notifications
+  useRealtime("notifications");
   const { collapsed, toggleMobile } = useSidebar();
   const searchRef = useRef<HTMLInputElement>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
