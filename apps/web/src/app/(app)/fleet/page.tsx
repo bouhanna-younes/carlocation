@@ -34,7 +34,6 @@ import {
   fuelTypeOptions,
   colorOptions,
   transmissionOptions,
-  categoryOptions,
 } from "@/lib/constants";
 
 const carSchema = z.object({
@@ -50,18 +49,16 @@ const carSchema = z.object({
     .number()
     .min(1, "السعر يجب أن يكون موجباً")
     .max(999999, "السعر مرتفع جداً"),
-  mileage: z.coerce.number().min(0, "المسافة يجب أن تكون موجبة").optional(),
   fuelType: z.string().min(1, "نوع الوقود مطلوب"),
   seats: z.coerce
     .number()
     .min(1, "عدد المقاعد مطلوب")
     .max(50, "الحد الأقصى 50 مقعد"),
-  image: z.string().optional(),
-  vin: z.string().max(17, "الحد الأقصى 17 حرف").optional(),
   transmission: z.enum(["manual", "automatic"]).optional(),
-  category: z
-    .enum(["economy", "sedan", "suv", "luxury", "van", "truck"])
-    .optional(),
+  insuranceExpiry: z.string().optional(),
+  oilChangeExpiry: z.string().optional(),
+  vignetteExpiry: z.string().optional(),
+  inspectionExpiry: z.string().optional(),
 });
 
 type CarFormData = z.input<typeof carSchema>;
@@ -90,13 +87,13 @@ function CarForm({
       plateNumber: "",
       color: "",
       dailyRate: 0,
-      mileage: 0,
       fuelType: "",
       seats: 5,
-      image: "",
-      vin: "",
       transmission: "manual",
-      category: "economy",
+      insuranceExpiry: "",
+      oilChangeExpiry: "",
+      vignetteExpiry: "",
+      inspectionExpiry: "",
     },
   });
 
@@ -221,19 +218,6 @@ function CarForm({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium mb-1.5 text-foreground/80">
-            المسافة المقطوعة (km)
-          </label>
-          <input
-            type="number"
-            {...register("mileage")}
-            className={inputClass}
-          />
-          {errors.mileage && (
-            <p className="text-xs text-danger mt-1">{errors.mileage.message}</p>
-          )}
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1.5 text-foreground/80">
             نوع القير
           </label>
           <select {...register("transmission")} className={inputClass}>
@@ -245,45 +229,38 @@ function CarForm({
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1.5 text-foreground/80">
-            فئة السيارة
-          </label>
-          <select {...register("category")} className={inputClass}>
-            {categoryOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1.5 text-foreground/80">
-            رقم VIN (اختياري)
-          </label>
-          <input
-            {...register("vin")}
-            className={inputClass}
-            placeholder="مثال: JTDKN3DU5A0123456"
-            dir="ltr"
-          />
-          {errors.vin && (
-            <p className="text-xs text-danger mt-1">{errors.vin.message}</p>
-          )}
+
+      {/* expiry dates */}
+      <div className="rounded-xl border border-border p-4 bg-surface/50 space-y-3">
+        <p className="text-sm font-semibold text-foreground/80">تواريخ الانتهاء</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium mb-1 text-foreground/70">
+              انتهاء التأمين
+            </label>
+            <input type="date" {...register("insuranceExpiry")} className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1 text-foreground/70">
+              انتهاء تبديل الزيت
+            </label>
+            <input type="date" {...register("oilChangeExpiry")} className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1 text-foreground/70">
+              انتهاء Vignette
+            </label>
+            <input type="date" {...register("vignetteExpiry")} className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1 text-foreground/70">
+              الفحص التقني
+            </label>
+            <input type="date" {...register("inspectionExpiry")} className={inputClass} />
+          </div>
         </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium mb-1.5 text-foreground/80">
-          رابط الصورة (اختياري)
-        </label>
-        <input
-          {...register("image")}
-          className={inputClass}
-          placeholder="https://example.com/car.jpg"
-          dir="ltr"
-        />
-      </div>
+
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="ghost" onClick={onCancel}>
           إلغاء
@@ -817,13 +794,13 @@ export default function FleetPage() {
               plateNumber: editCar.plateNumber,
               color: editCar.color,
               dailyRate: editCar.dailyRate,
-              mileage: editCar.mileage ?? 0,
               fuelType: editCar.fuelType,
               seats: editCar.seats,
-              image: editCar.image ?? "",
-              vin: editCar.vin ?? "",
               transmission: editCar.transmission ?? "manual",
-              category: editCar.category ?? "economy",
+              insuranceExpiry: editCar.insuranceExpiry ?? "",
+              oilChangeExpiry: editCar.oilChangeExpiry ?? "",
+              vignetteExpiry: editCar.vignetteExpiry ?? "",
+              inspectionExpiry: editCar.inspectionExpiry ?? "",
             }}
             onSubmit={(data) => editMutation.mutate({ id: editCar.id, data })}
             onCancel={() => setEditCar(null)}
@@ -913,42 +890,35 @@ export default function FleetPage() {
                 </span>
               </div>
               <div>
-                <span className="text-muted">المسافة:</span>{" "}
-                <span className="font-medium">
-                  {new Intl.NumberFormat("ar-DZ").format(viewCar.mileage ?? 0)}{" "}
-                  km
-                </span>
-              </div>
-              <div>
                 <span className="text-muted">القير:</span>{" "}
                 <span className="font-medium">
                   {viewCar.transmission === "automatic" ? "أوتوماتيكي" : "يدوي"}
                 </span>
               </div>
               <div>
-                <span className="text-muted">الفئة:</span>{" "}
-                <span className="font-medium">
-                  {viewCar.category === "economy"
-                    ? "اقتصادية"
-                    : viewCar.category === "sedan"
-                      ? "سيدان"
-                      : viewCar.category === "suv"
-                        ? "SUV"
-                        : viewCar.category === "luxury"
-                          ? "فاخرة"
-                          : viewCar.category === "van"
-                            ? "فان"
-                            : viewCar.category === "truck"
-                              ? "شاحنة"
-                              : viewCar.category}
+                <span className="text-muted">انتهاء التأمين:</span>{" "}
+                <span className={`font-medium ${viewCar.insuranceExpiry && new Date(viewCar.insuranceExpiry) < new Date(Date.now() + 15 * 86400000) ? "text-danger" : ""}`}>
+                  {viewCar.insuranceExpiry ?? "غير محدد"}
                 </span>
               </div>
-              {viewCar.vin && (
-                <div>
-                  <span className="text-muted">VIN:</span>{" "}
-                  <span className="font-mono">{viewCar.vin}</span>
-                </div>
-              )}
+              <div>
+                <span className="text-muted">انتهاء تبديل الزيت:</span>{" "}
+                <span className={`font-medium ${viewCar.oilChangeExpiry && new Date(viewCar.oilChangeExpiry) < new Date(Date.now() + 15 * 86400000) ? "text-danger" : ""}`}>
+                  {viewCar.oilChangeExpiry ?? "غير محدد"}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted">انتهاء Vignette:</span>{" "}
+                <span className={`font-medium ${viewCar.vignetteExpiry && new Date(viewCar.vignetteExpiry) < new Date(Date.now() + 15 * 86400000) ? "text-danger" : ""}`}>
+                  {viewCar.vignetteExpiry ?? "غير محدد"}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted">الفحص التقني:</span>{" "}
+                <span className={`font-medium ${viewCar.inspectionExpiry && new Date(viewCar.inspectionExpiry) < new Date(Date.now() + 15 * 86400000) ? "text-danger" : ""}`}>
+                  {viewCar.inspectionExpiry ?? "غير محدد"}
+                </span>
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button

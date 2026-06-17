@@ -16,13 +16,13 @@ export interface Car {
   color: string;
   dailyRate: number;
   status: "available" | "rented" | "maintenance" | "out_of_service";
-  mileage: number;
   fuelType: string;
   seats: number;
-  image?: string;
-  vin?: string;
   transmission?: "manual" | "automatic";
-  category?: "economy" | "sedan" | "suv" | "luxury" | "van" | "truck";
+  insuranceExpiry?: string;
+  oilChangeExpiry?: string;
+  vignetteExpiry?: string;
+  inspectionExpiry?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,13 +37,13 @@ export function mapCar(row: SupabaseCar): Car {
     color: row.color,
     dailyRate: row.daily_rate,
     status: row.status,
-    mileage: row.mileage,
     fuelType: row.fuel_type,
     seats: row.seats,
-    image: row.image ?? undefined,
-    vin: row.vin ?? undefined,
     transmission: row.transmission,
-    category: row.category,
+    insuranceExpiry: row.insurance_expiry ?? undefined,
+    oilChangeExpiry: row.oil_change_expiry ?? undefined,
+    vignetteExpiry: row.vignette_expiry ?? undefined,
+    inspectionExpiry: row.inspection_expiry ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -58,13 +58,13 @@ export function toCarInsert(data: Partial<Car>): Tables["cars"]["Insert"] {
     color: data.color!,
     daily_rate: data.dailyRate!,
     status: data.status as Tables["cars"]["Insert"]["status"],
-    mileage: data.mileage ?? 0,
     fuel_type: data.fuelType!,
     seats: data.seats!,
-    image: data.image,
-    vin: data.vin,
     transmission: data.transmission as Tables["cars"]["Insert"]["transmission"],
-    category: data.category as Tables["cars"]["Insert"]["category"],
+    insurance_expiry: data.insuranceExpiry,
+    oil_change_expiry: data.oilChangeExpiry,
+    vignette_expiry: data.vignetteExpiry,
+    inspection_expiry: data.inspectionExpiry,
   };
 }
 
@@ -78,16 +78,14 @@ export function toCarUpdate(data: Partial<Car>): Tables["cars"]["Update"] {
   if (data.dailyRate !== undefined) update.daily_rate = data.dailyRate;
   if (data.status !== undefined)
     update.status = data.status as Tables["cars"]["Update"]["status"];
-  if (data.mileage !== undefined) update.mileage = data.mileage;
   if (data.fuelType !== undefined) update.fuel_type = data.fuelType;
   if (data.seats !== undefined) update.seats = data.seats;
-  if (data.image !== undefined) update.image = data.image;
-  if (data.vin !== undefined) update.vin = data.vin;
   if (data.transmission !== undefined)
-    update.transmission =
-      data.transmission as Tables["cars"]["Update"]["transmission"];
-  if (data.category !== undefined)
-    update.category = data.category as Tables["cars"]["Update"]["category"];
+    update.transmission = data.transmission as Tables["cars"]["Update"]["transmission"];
+  if (data.insuranceExpiry !== undefined) update.insurance_expiry = data.insuranceExpiry;
+  if (data.oilChangeExpiry !== undefined) update.oil_change_expiry = data.oilChangeExpiry;
+  if (data.vignetteExpiry !== undefined) update.vignette_expiry = data.vignetteExpiry;
+  if (data.inspectionExpiry !== undefined) update.inspection_expiry = data.inspectionExpiry;
   return update;
 }
 
@@ -346,5 +344,73 @@ export function mapAvailableCar(row: SupabaseCar): AvailableCar {
     model: row.model,
     plateNumber: row.plate_number,
     dailyRate: row.daily_rate,
+  };
+}
+
+// =====================================================
+// INVOICE MAPPING
+// =====================================================
+type SupabaseInvoice = Tables["invoices"]["Row"];
+
+export interface Invoice {
+  id: string;
+  rentalId: string;
+  customerId: string;
+  carId: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  startDate: string;
+  endDate: string;
+  returnDate?: string;
+  dailyRate: number;
+  totalDays: number;
+  totalAmount: number;
+  depositAmount: number;
+  isCancelled: boolean;
+  cancelledAt?: string;
+  cancellationReason?: string;
+  penaltyPercent: number;
+  penaltyAmount: number;
+  refundAmount: number;
+  paidAmount: number;
+  paymentMethod?: string;
+  status: "pending" | "paid" | "refunded" | "cancelled";
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Joined data
+  customer?: Customer;
+  car?: Car;
+}
+
+export function mapInvoice(row: SupabaseInvoice & { customer?: SupabaseCustomer; car?: SupabaseCar }): Invoice {
+  return {
+    id: row.id,
+    rentalId: row.rental_id,
+    customerId: row.customer_id,
+    carId: row.car_id,
+    invoiceNumber: row.invoice_number,
+    invoiceDate: row.invoice_date,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    returnDate: row.return_date ?? undefined,
+    dailyRate: row.daily_rate,
+    totalDays: row.total_days,
+    totalAmount: row.total_amount,
+    depositAmount: row.deposit_amount,
+    isCancelled: row.is_cancelled,
+    cancelledAt: row.cancelled_at ?? undefined,
+    cancellationReason: row.cancellation_reason ?? undefined,
+    penaltyPercent: row.penalty_percent,
+    penaltyAmount: row.penalty_amount,
+    refundAmount: row.refund_amount,
+    paidAmount: row.paid_amount,
+    paymentMethod: row.payment_method ?? undefined,
+    status: row.status,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    customer: row.customer ? mapCustomer(row.customer) : undefined,
+    car: row.car ? mapCar(row.car) : undefined,
   };
 }

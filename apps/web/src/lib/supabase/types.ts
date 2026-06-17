@@ -42,13 +42,13 @@ export interface Database {
           color: string;
           daily_rate: number;
           status: "available" | "rented" | "maintenance" | "out_of_service";
-          mileage: number;
           fuel_type: string;
           seats: number;
-          image: string | null;
-          vin: string | null;
           transmission: "manual" | "automatic";
-          category: "economy" | "sedan" | "suv" | "luxury" | "van" | "truck";
+          insurance_expiry: string | null;
+          oil_change_expiry: string | null;
+          vignette_expiry: string | null;
+          inspection_expiry: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -60,13 +60,13 @@ export interface Database {
           color: string;
           daily_rate: number;
           status?: "available" | "rented" | "maintenance" | "out_of_service";
-          mileage?: number;
           fuel_type: string;
           seats: number;
-          image?: string;
-          vin?: string;
           transmission?: "manual" | "automatic";
-          category?: "economy" | "sedan" | "suv" | "luxury" | "van" | "truck";
+          insurance_expiry?: string;
+          oil_change_expiry?: string;
+          vignette_expiry?: string;
+          inspection_expiry?: string;
         };
         Update: {
           brand?: string;
@@ -76,13 +76,13 @@ export interface Database {
           color?: string;
           daily_rate?: number;
           status?: "available" | "rented" | "maintenance" | "out_of_service";
-          mileage?: number;
           fuel_type?: string;
           seats?: number;
-          image?: string;
-          vin?: string;
           transmission?: "manual" | "automatic";
-          category?: "economy" | "sedan" | "suv" | "luxury" | "van" | "truck";
+          insurance_expiry?: string;
+          oil_change_expiry?: string;
+          vignette_expiry?: string;
+          inspection_expiry?: string;
         };
       };
       customers: {
@@ -265,15 +265,73 @@ export interface Database {
           message: string;
           type: "info" | "success" | "warning";
           is_read: boolean;
+          category: string;
           created_at: string;
         };
         Insert: {
           title: string;
           message: string;
           type?: "info" | "success" | "warning";
+          category?: string;
         };
         Update: {
           is_read?: boolean;
+        };
+      };
+      invoices: {
+        Row: {
+          id: string;
+          rental_id: string;
+          customer_id: string;
+          car_id: string;
+          invoice_number: string;
+          invoice_date: string;
+          start_date: string;
+          end_date: string;
+          return_date: string | null;
+          daily_rate: number;
+          total_days: number;
+          total_amount: number;
+          deposit_amount: number;
+          is_cancelled: boolean;
+          cancelled_at: string | null;
+          cancellation_reason: string | null;
+          penalty_percent: number;
+          penalty_amount: number;
+          refund_amount: number;
+          paid_amount: number;
+          payment_method: string | null;
+          status: "pending" | "paid" | "refunded" | "cancelled";
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          rental_id: string;
+          customer_id: string;
+          car_id: string;
+          invoice_number: string;
+          start_date: string;
+          end_date: string;
+          daily_rate: number;
+          total_days: number;
+          total_amount: number;
+          deposit_amount?: number;
+          status?: "pending" | "paid" | "refunded" | "cancelled";
+          notes?: string;
+        };
+        Update: {
+          return_date?: string;
+          paid_amount?: number;
+          payment_method?: string;
+          status?: "pending" | "paid" | "refunded" | "cancelled";
+          is_cancelled?: boolean;
+          cancelled_at?: string;
+          cancellation_reason?: string;
+          penalty_percent?: number;
+          penalty_amount?: number;
+          refund_amount?: number;
+          notes?: string;
         };
       };
     };

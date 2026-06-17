@@ -21,6 +21,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 import type { Notification } from "@/lib/types";
@@ -58,6 +59,12 @@ const navGroups: NavGroup[] = [
     label: "المزيد",
     items: [
       {
+        href: "/invoices",
+        label: "الفواتير",
+        icon: FileText,
+        managerOnly: true,
+      },
+      {
         href: "/reports",
         label: "التقارير",
         icon: BarChart3,
@@ -77,6 +84,21 @@ const navGroups: NavGroup[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+
+  // Fetch platform name from settings
+  const { data: settings } = useQuery<{ platformInfo: { name?: string } }>({
+    queryKey: ["settings"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "platform_info")
+        .single();
+      const row = data as { value: string } | null;
+      return { platformInfo: row ? JSON.parse(row.value) : {} };
+    },
+  });
+  const platformName = settings?.platformInfo?.name || "CarLocation";
   const { collapsed, mobileOpen, setMobileOpen, toggleCollapsed } =
     useSidebar();
   const isManager = user?.role === "manager";
@@ -208,7 +230,7 @@ export function Sidebar() {
                   </svg>
                 </div>
                 <span className="text-[15px] font-bold tracking-tight gradient-text">
-                  CarLocation
+                  {platformName}
                 </span>
               </div>
               <button

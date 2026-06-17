@@ -7,13 +7,13 @@ export interface Car {
   color: string;
   dailyRate: number;
   status: "available" | "rented" | "maintenance" | "out_of_service";
-  mileage: number;
   fuelType: string;
   seats: number;
-  image?: string;
-  vin?: string;
   transmission?: "manual" | "automatic";
-  category?: "economy" | "sedan" | "suv" | "luxury" | "van" | "truck";
+  insuranceExpiry?: string;
+  oilChangeExpiry?: string;
+  vignetteExpiry?: string;
+  inspectionExpiry?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -21,6 +21,7 @@ export const rentalSchema = z
         return date >= today;
       }, "تاريخ البداية لا يمكن أن يكون في الماضي"),
     endDate: z.string().min(1, "تاريخ النهاية مطلوب"),
+    startMileage: z.coerce.number().min(0, "المسافة يجب أن تكون موجبة"),
     dailyRate: z.coerce.number().min(0).optional(),
     discountPercent: z.coerce.number().min(0).max(50, "الحد الأقصى للتخفيض 50%").optional(),
     discountReason: z.string().optional(),
@@ -91,6 +92,7 @@ export function RentalForm({
       carId: "",
       startDate: "",
       endDate: "",
+      startMileage: 0,
       dailyRate: undefined,
       discountPercent: 0,
       discountReason: "",
@@ -120,6 +122,7 @@ export function RentalForm({
   const discount = watchedDiscount || 0;
   const effectiveRate = Math.round(baseRate * (1 - discount / 100));
 
+  // Full days calculation (not fractional)
   const estimatedDays =
     watchedStart && watchedEnd
       ? Math.max(
@@ -197,6 +200,21 @@ export function RentalForm({
           )}
         </div>
       </div>
+      <div>
+        <label className="block text-sm font-medium mb-1.5 text-foreground/80">
+          المسافة المقطوعة الحالية للسيارة (km)
+        </label>
+        <input
+          type="number"
+          min="0"
+          {...register("startMileage")}
+          className={inputClass}
+          placeholder="أدخل العداد الحالي"
+        />
+        {errors.startMileage && (
+          <p className="text-xs text-danger mt-1">{errors.startMileage.message}</p>
+        )}
+      </div>
 
       {/* Price Section */}
       <div className="space-y-3 rounded-xl border border-border p-4 bg-surface/50">
@@ -227,7 +245,7 @@ export function RentalForm({
             <input
               type="number"
               min="0"
-              max="100"
+              max="50"
               {...register("discountPercent")}
               className={inputClass}
               placeholder="0"

@@ -148,6 +148,23 @@ export default function RentalsPage() {
 
   const addMutation = useMutation({
     mutationFn: async (data: RentalFormData) => {
+      // Check if customer's license expires within 30 days
+      const { data: custData } = await supabase
+        .from("customers")
+        .select("driver_license_expiry")
+        .eq("id", data.customerId)
+        .single();
+      const customer = custData as { driver_license_expiry: string | null } | null;
+
+      if (customer?.driver_license_expiry) {
+        const expiryDate = new Date(customer.driver_license_expiry);
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+        if (expiryDate <= thirtyDaysFromNow) {
+          throw new Error("رخصة القيادة منتهية أو ستنتهي خلال 30 يوماً — لا يمكن إنشاء التأجير");
+        }
+      }
+
       // Check for date overlap on the same car
       const { data: overlapping, count: overlapCount } = await supabase
         .from("rentals")
@@ -182,6 +199,7 @@ export default function RentalsPage() {
         daily_rate: dailyRate,
         total_amount: totalAmount,
         deposit_amount: data.depositAmount || 0,
+        start_mileage: data.startMileage ?? 0,
         notes: data.notes || null,
         discount_percent: discount || null,
         discount_reason: data.discountReason || null,
@@ -206,11 +224,25 @@ export default function RentalsPage() {
   const returnMutation = useMutation({
     mutationFn: async (id: string) => {
       const rental = rentals?.find((r) => r.id === id);
+      if (!rental) throw new Error("الكراء غير موجود");
+
+      // Calculate fractional days for accurate billing
+      const now = new Date();
+      const startDate = new Date(rental.startDate);
+      const elapsedMs = now.getTime() - startDate.getTime();
+      const elapsedDays = elapsedMs / 86400000;
+
+      // Full days used (for billing)
+      const usedDays = Math.max(1, Math.ceil(elapsedDays));
+      const finalAmount = usedDays * rental.dailyRate;
+
       const { error } = await (supabase
         .from("rentals") as any)
         .update({
           status: "completed",
-          return_date: new Date().toISOString(),
+          return_date: now.toISOString(),
+          total_amount: finalAmount,
+          end_mileage: null,
         })
         .eq("id", id);
       if (error) throw new Error(error.message);
@@ -236,11 +268,30 @@ export default function RentalsPage() {
   const cancelMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
       const rental = rentals?.find((r) => r.id === id);
+      if (!rental) throw new Error("الكراء غير موجود");
+
+      // Calculate fractional days for accurate billing
+      const now = new Date();
+      const startDate = new Date(rental.startDate);
+      const elapsedMs = now.getTime() - startDate.getTime();
+      const elapsedDays = elapsedMs / 86400000;
+
+      // Full days used (for billing) + 35% penalty
+      const usedDays = Math.max(1, Math.ceil(elapsedDays));
+      const usedAmount = usedDays * rental.dailyRate;
+      const penalty = usedAmount * 0.35;
+      const totalAmount = usedAmount + penalty;
+
+      const notes = reason
+        ? `ملغى: ${reason} | استُخدم ${usedDays} يوم | غرامة 35%: ${penalty} DZD`
+        : `استُخدم ${usedDays} يوم | غرامة 35%: ${penalty} DZD`;
+
       const { error } = await (supabase
         .from("rentals") as any)
         .update({
           status: "cancelled",
-          notes: reason ? `ملغى: ${reason}` : undefined,
+          total_amount: totalAmount,
+          notes,
         })
         .eq("id", id);
       if (error) throw new Error(error.message);

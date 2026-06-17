@@ -86,7 +86,7 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState("");
 
   const changePasswordMutation = useMutation({
-    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+    mutationFn: async (data: { newPassword: string }) => {
       const { error } = await supabase.auth.updateUser({ password: data.newPassword });
       if (error) throw new Error(error.message);
     },
@@ -102,10 +102,46 @@ export default function SettingsPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const [emailForm, setEmailForm] = useState({
+    newEmail: "",
+  });
+  const [emailError, setEmailError] = useState("");
+
+  const changeEmailMutation = useMutation({
+    mutationFn: async (data: { newEmail: string }) => {
+      // Update email without verification
+      const { error } = await supabase.auth.updateUser({ email: data.newEmail });
+      if (error) throw new Error(error.message);
+      
+      // Auto-confirm the new email
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) {
+        await supabase.auth.admin.updateUserById(userData.user.id, {
+          email_confirm: true,
+        }).catch(() => {
+          // Ignore if using anon key - email confirmation may be required
+        });
+      }
+      
+      // Update profile
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ email: data.newEmail } as never)
+        .eq("id", userData?.user?.id ?? "");
+      if (profileError) throw new Error(profileError.message);
+    },
+    onSuccess: () => {
+      setEmailForm({ newEmail: "" });
+      setEmailError("");
+      toast.success("تم تغيير البريد الإلكتروني بنجاح");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const handlePasswordChange = () => {
     setPasswordError("");
-    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
-      setPasswordError("جميع الحقول مطلوبة");
+    if (!passwordForm.newPassword) {
+      setPasswordError("كلمة المرور الجديدة مطلوبة");
       return;
     }
     if (passwordForm.newPassword.length < 6) {
@@ -117,9 +153,21 @@ export default function SettingsPage() {
       return;
     }
     changePasswordMutation.mutate({
-      currentPassword: passwordForm.currentPassword,
       newPassword: passwordForm.newPassword,
     });
+  };
+
+  const handleEmailChange = () => {
+    setEmailError("");
+    if (!emailForm.newEmail) {
+      setEmailError("البريد الإلكتروني الجديد مطلوب");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailForm.newEmail)) {
+      setEmailError("البريد الإلكتروني غير صالح");
+      return;
+    }
+    changeEmailMutation.mutate({ newEmail: emailForm.newEmail });
   };
 
   if (error) {
@@ -273,75 +321,83 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold">الأمان</h2>
-                <p className="text-xs text-muted mt-0.5">تغيير كلمة المرور</p>
+                <p className="text-xs text-muted mt-0.5">تغيير كلمة المرور والبريد</p>
               </div>
             </div>
-            <div className="space-y-4 max-w-md">
-              <div>
-                <label className="block text-sm font-medium mb-1.5 text-foreground/80">
-                  كلمة المرور الحالية
-                </label>
-                <input
-                  type="password"
-                  value={passwordForm.currentPassword}
-                  onChange={(e) =>
-                    setPasswordForm({
-                      ...passwordForm,
-                      currentPassword: e.target.value,
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="أدخل كلمة المرور الحالية"
-                />
+            <div className="space-y-6">
+              {/* Email Change */}
+              <div className="space-y-3 max-w-md">
+                <h3 className="text-sm font-medium text-foreground/80">تغيير البريد الإلكتروني</h3>
+                <div>
+                  <input
+                    type="email"
+                    value={emailForm.newEmail}
+                    onChange={(e) => setEmailForm({ newEmail: e.target.value })}
+                    className={inputClass}
+                    placeholder="البريد الإلكتروني الجديد"
+                  />
+                </div>
+                {emailError && (
+                  <p className="text-xs text-danger">{emailError}</p>
+                )}
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleEmailChange}
+                    disabled={changeEmailMutation.isPending}
+                    className="flex items-center gap-2 bg-gradient-to-l from-info to-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50 hover-lift"
+                  >
+                    <Lock className="w-4 h-4" />
+                    {changeEmailMutation.isPending ? "جاري التغيير..." : "تغيير البريد"}
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5 text-foreground/80">
-                  كلمة المرور الجديدة
-                </label>
-                <input
-                  type="password"
-                  value={passwordForm.newPassword}
-                  onChange={(e) =>
-                    setPasswordForm({
-                      ...passwordForm,
-                      newPassword: e.target.value,
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="6 أحرف على الأقل"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5 text-foreground/80">
-                  تأكيد كلمة المرور
-                </label>
-                <input
-                  type="password"
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) =>
-                    setPasswordForm({
-                      ...passwordForm,
-                      confirmPassword: e.target.value,
-                    })
-                  }
-                  className={inputClass}
-                  placeholder="أعد إدخال كلمة المرور"
-                />
-              </div>
-              {passwordError && (
-                <p className="text-xs text-danger">{passwordError}</p>
-              )}
-              <div className="flex justify-end">
-                <button
-                  onClick={handlePasswordChange}
-                  disabled={changePasswordMutation.isPending}
-                  className="flex items-center gap-2 bg-gradient-to-l from-primary to-primary-hover text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50 hover-lift glow-primary"
-                >
-                  <Lock className="w-4 h-4" />
-                  {changePasswordMutation.isPending
-                    ? "جاري التغيير..."
-                    : "تغيير كلمة المرور"}
-                </button>
+
+              {/* Password Change */}
+              <div className="space-y-3 max-w-md border-t border-border pt-6">
+                <h3 className="text-sm font-medium text-foreground/80">تغيير كلمة المرور</h3>
+                <div>
+                  <input
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={(e) =>
+                      setPasswordForm({
+                        ...passwordForm,
+                        newPassword: e.target.value,
+                      })
+                    }
+                    className={inputClass}
+                    placeholder="كلمة المرور الجديدة (6 أحرف على الأقل)"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) =>
+                      setPasswordForm({
+                        ...passwordForm,
+                        confirmPassword: e.target.value,
+                      })
+                    }
+                    className={inputClass}
+                    placeholder="تأكيد كلمة المرور"
+                  />
+                </div>
+                {passwordError && (
+                  <p className="text-xs text-danger">{passwordError}</p>
+                )}
+                <div className="flex justify-end">
+                  <button
+                    onClick={handlePasswordChange}
+                    disabled={changePasswordMutation.isPending}
+                    className="flex items-center gap-2 bg-gradient-to-l from-primary to-primary-hover text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50 hover-lift glow-primary"
+                  >
+                    <Lock className="w-4 h-4" />
+                    {changePasswordMutation.isPending
+                      ? "جاري التغيير..."
+                      : "تغيير كلمة المرور"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
+import { checkExpiryDates } from "@/lib/notifications";
 import {
   Car,
   KeyRound,
@@ -181,6 +182,13 @@ function ErrorState({ message }: { message?: string }) {
 
 /* ═══════════════ MAIN ═══════════════ */
 export default function DashboardPage() {
+  // Check expiry dates on dashboard load
+  const { data: expiryCount } = useQuery({
+    queryKey: ["expiry-check"],
+    queryFn: checkExpiryDates,
+    refetchInterval: 3600000, // Check every hour
+  });
+
   const {
     data: kpis,
     isLoading,
