@@ -265,16 +265,19 @@ export default function NotificationsPage() {
                 <div
                   key={n.id}
                   onClick={() => {
-                    if (!n.isRead) markRead.mutate(n.id);
                     // Navigate to fleet page with carId for expiry notifications
+                    // Don't mark as read here — only after saving changes
                     if (carLinkedCategories.includes(n.category) && n.metadata) {
                       try {
                         const meta = JSON.parse(n.metadata);
                         if (meta.carId) {
-                          router.push(`/fleet?edit=${meta.carId}`);
+                          router.push(`/fleet?edit=${meta.carId}&notification=${n.id}`);
+                          return;
                         }
                       } catch {}
                     }
+                    // For non-car notifications, mark as read on click
+                    if (!n.isRead) markRead.mutate(n.id);
                   }}
                   className={`flex items-start gap-4 p-4 transition-all duration-200 cursor-pointer ${
                     n.isRead

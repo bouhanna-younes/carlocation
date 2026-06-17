@@ -284,8 +284,9 @@ export default function FleetPage() {
   const [viewCar, setViewCar] = useState<Car | null>(null);
   const queryClient = useQueryClient();
 
-  // Read edit parameter from URL
+  // Read edit and notification parameters from URL
   const editId = searchParams.get("edit");
+  const notificationId = searchParams.get("notification");
 
   const {
     data: cars,
@@ -391,9 +392,19 @@ export default function FleetPage() {
         .eq("id", id);
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["cars"] });
       toast.success("تم تعديل السيارة بنجاح");
+
+      // Mark linked notification as read after successful save
+      if (notificationId) {
+        await (supabase
+          .from("notifications") as any)
+          .update({ is_read: true })
+          .eq("id", notificationId);
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      }
+
       setEditCar(null);
     },
     onError: (err: Error) => toast.error(err.message),
