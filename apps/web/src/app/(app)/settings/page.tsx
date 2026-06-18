@@ -13,6 +13,7 @@ import {
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { inputClass } from "@/lib/constants";
+import { useRole } from "@/hooks/use-role";
 
 interface PlatformInfo {
   name?: string;
@@ -22,6 +23,7 @@ interface PlatformInfo {
 }
 
 export default function SettingsPage() {
+  const { isManager } = useRole();
   const {
     data: settings,
     isLoading,
@@ -109,26 +111,17 @@ export default function SettingsPage() {
 
   const changeEmailMutation = useMutation({
     mutationFn: async (data: { newEmail: string }) => {
-      // Update email without verification
       const { error } = await supabase.auth.updateUser({ email: data.newEmail });
       if (error) throw new Error(error.message);
-      
-      // Auto-confirm the new email
+
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user) {
-        await supabase.auth.admin.updateUserById(userData.user.id, {
-          email_confirm: true,
-        }).catch(() => {
-          // Ignore if using anon key - email confirmation may be required
-        });
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({ email: data.newEmail } as never)
+          .eq("id", userData.user.id);
+        if (profileError) throw new Error(profileError.message);
       }
-      
-      // Update profile
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ email: data.newEmail } as never)
-        .eq("id", userData?.user?.id ?? "");
-      if (profileError) throw new Error(profileError.message);
     },
     onSuccess: () => {
       setEmailForm({ newEmail: "" });
@@ -218,7 +211,8 @@ export default function SettingsPage() {
         </div>
       ) : (
         <div className="grid gap-6">
-          {/* Platform Info Section */}
+          {/* Platform Info Section - Managers only */}
+          {isManager && (
           <div className="glass card-gradient rounded-2xl p-6 hover-lift">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2.5 rounded-xl bg-warning/10">
@@ -312,6 +306,7 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+          )}
 
           {/* Security Section */}
           <div className="glass card-gradient rounded-2xl p-6 hover-lift">

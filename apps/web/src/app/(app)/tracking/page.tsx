@@ -41,16 +41,13 @@ export default function TrackingPage() {
       if (carsError) throw new Error(carsError.message);
 
       const { data: trackingData } = await supabase
-        .from("tracking")
+        .from("latest_tracking")
         .select("car_id, latitude, longitude, timestamp")
-        .order("timestamp", { ascending: false })
         .returns<any[]>();
 
       const latestByCar = new Map<string, { latitude: number; longitude: number; timestamp: string }>();
       for (const t of trackingData ?? []) {
-        if (!latestByCar.has(t.car_id)) {
-          latestByCar.set(t.car_id, { latitude: t.latitude, longitude: t.longitude, timestamp: t.timestamp });
-        }
+        latestByCar.set(t.car_id, { latitude: t.latitude, longitude: t.longitude, timestamp: t.timestamp });
       }
 
       return (carsData ?? []).map((car) => {

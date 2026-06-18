@@ -21,6 +21,7 @@ import {
   DollarSign,
   TrendingUp,
   TrendingDown,
+  ShieldAlert,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ import { useTableState } from "@/hooks/use-table-state";
 import { inputClass } from "@/lib/constants";
 import { exportToCSV } from "@/lib/export-csv";
 import { useRealtime } from "@/hooks/use-realtime";
+import { useRole } from "@/hooks/use-role";
 
 const statusMap: Record<string, { label: string; colorClass: string }> = {
   pending: { label: "معلقة", colorClass: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
@@ -170,6 +172,7 @@ function InvoicePrintView({ invoice }: { invoice: Invoice }) {
 }
 
 export default function InvoicesPage() {
+  const { isManager } = useRole();
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const queryClient = useQueryClient();
@@ -249,6 +252,18 @@ export default function InvoicesPage() {
   const totalRevenue = invoices?.filter((i) => i.status === "paid").reduce((s, i) => s + i.paidAmount, 0) ?? 0;
   const totalRefunded = invoices?.filter((i) => i.status === "refunded").reduce((s, i) => s + i.refundAmount, 0) ?? 0;
   const totalPenalties = invoices?.reduce((s, i) => s + i.penaltyAmount, 0) ?? 0;
+
+  if (!isManager) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
+        <div className="p-4 rounded-2xl bg-danger/10 mb-4">
+          <ShieldAlert className="w-12 h-12 text-danger" />
+        </div>
+        <h2 className="text-xl font-bold mb-2">غير مصرح به</h2>
+        <p className="text-muted text-sm">ليس لديك صلاحية للوصول إلى هذه الصفحة</p>
+      </div>
+    );
+  }
 
   const handleExport = () => {
     const exportData = sorted.map((inv) => ({

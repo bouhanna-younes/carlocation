@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
-import { TrendingUp, Car, Users, AlertCircle, Wrench } from "lucide-react";
+import { TrendingUp, Car, Users, AlertCircle, Wrench, ShieldAlert } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -16,6 +16,7 @@ import {
   Pie,
   Cell,
 } from "@/components/shared/chart-wrapper";
+import { useRole } from "@/hooks/use-role";
 
 interface MonthlyRevenue {
   month: string;
@@ -60,6 +61,7 @@ function ErrorState({ message }: { message: string }) {
 }
 
 export default function ReportsPage() {
+  const { isManager } = useRole();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const {
@@ -197,6 +199,18 @@ export default function ReportsPage() {
       return months;
     },
   });
+
+  if (!isManager) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
+        <div className="p-4 rounded-2xl bg-danger/10 mb-4">
+          <ShieldAlert className="w-12 h-12 text-danger" />
+        </div>
+        <h2 className="text-xl font-bold mb-2">غير مصرح به</h2>
+        <p className="text-muted text-sm">ليس لديك صلاحية للوصول إلى هذه الصفحة</p>
+      </div>
+    );
+  }
 
   const totalRevenue =
     monthlyRevenue?.reduce((sum, m) => sum + m.revenue, 0) ?? 0;
