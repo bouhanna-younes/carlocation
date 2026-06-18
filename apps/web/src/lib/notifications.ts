@@ -39,8 +39,9 @@ export const categoryColors: Record<NotificationCategory, string> = {
 };
 
 /**
- * Check all expiry dates and create notifications
- * This should be called periodically (e.g., on page load or via cron)
+ * Sync notifications with actual car/customer data:
+ * - Create notifications for dates within 15 days (if not already exists)
+ * - DELETE notifications for dates that are now > 15 days or past
  */
 export async function checkExpiryDates(): Promise<number> {
   const now = new Date();
@@ -48,71 +49,82 @@ export async function checkExpiryDates(): Promise<number> {
   const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
   let notificationsCreated = 0;
+  let notificationsDeleted = 0;
 
-  // 1. Check car insurance expiry
+  // Get all existing expiry notifications (unread)
+  const { data: existingNotifs } = await supabase
+    .from("notifications")
+    .select("id, title, category, metadata")
+    .in("category", [
+      "insurance_expiry",
+      "oil_change_expiry",
+      "vignette_expiry",
+      "inspection_expiry",
+      "license_expiry",
+    ])
+    .eq("is_read", false)
+    .returns<{ id: string; title: string; category: string; metadata: string | null }[]>();
+
+  // Build a map of existing notifications by car+category
+  const existingMap = new Map<string, string>(); // key: "carId|category" → notificationId
+  for (const n of existingNotifs ?? []) {
+    try {
+      const meta = n.metadata ? JSON.parse(n.metadata) : null;
+      if (meta?.carId) {
+        existingMap.set(`${meta.carId}|${n.category}`, n.id);
+      }
+    } catch {}
+  }
+
+  // 1. Check car expiry dates
   const { data: cars } = await supabase
     .from("cars")
     .select("id, brand, model, insurance_expiry, oil_change_expiry, vignette_expiry, inspection_expiry")
     .returns<{ id: string; brand: string; model: string; insurance_expiry: string | null; oil_change_expiry: string | null; vignette_expiry: string | null; inspection_expiry: string | null }[]>();
 
+  const carExpiryFields: Array<{
+    field: string;
+    category: NotificationCategory;
+    label: string;
+  }> = [
+    { field: "insurance_expiry", category: "insurance_expiry", label: "تأمين السيارة" },
+    { field: "oil_change_expiry", category: "oil_change_expiry", label: "تبديل الزيت" },
+    { field: "vignette_expiry", category: "vignette_expiry", label: "Vignette" },
+    { field: "inspection_expiry", category: "inspection_expiry", label: "الفحص التقني" },
+  ];
+
   for (const car of cars ?? []) {
-    // Insurance expiry
-    if (car.insurance_expiry) {
-      const expiryDate = new Date(car.insurance_expiry);
-      if (expiryDate <= in15Days && expiryDate > now) {
-        const created = await createExpiryNotification(
-          `${car.brand} ${car.model}`,
-          "insurance_expiry",
-          `تأمين السيارة ينتهي في ${expiryDate.toLocaleDateString("ar-DZ")}`,
-          expiryDate,
-          car.id
-        );
-        if (created) notificationsCreated++;
-      }
-    }
+    const subject = `${car.brand} ${car.model}`;
 
-    // Oil change expiry
-    if (car.oil_change_expiry) {
-      const expiryDate = new Date(car.oil_change_expiry);
-      if (expiryDate <= in15Days && expiryDate > now) {
-        const created = await createExpiryNotification(
-          `${car.brand} ${car.model}`,
-          "oil_change_expiry",
-          `تبديل الزيت للسيارة ينتهي في ${expiryDate.toLocaleDateString("ar-DZ")}`,
-          expiryDate,
-          car.id
-        );
-        if (created) notificationsCreated++;
-      }
-    }
+    for (const { field, category, label } of carExpiryFields) {
+      const expiryDate = car[field as keyof typeof car] as string | null;
+      const existingId = existingMap.get(`${car.id}|${category}`);
 
-    // Vignette expiry
-    if (car.vignette_expiry) {
-      const expiryDate = new Date(car.vignette_expiry);
-      if (expiryDate <= in15Days && expiryDate > now) {
-        const created = await createExpiryNotification(
-          `${car.brand} ${car.model}`,
-          "vignette_expiry",
-          `Vignette السيارة ينتهي في ${expiryDate.toLocaleDateString("ar-DZ")}`,
-          expiryDate,
-          car.id
-        );
-        if (created) notificationsCreated++;
-      }
-    }
+      if (expiryDate) {
+        const exp = new Date(expiryDate);
+        const isWithin15Days = exp <= in15Days && exp > now;
+        const isPastOrSafe = exp > in15Days || exp <= now;
 
-    // Inspection expiry
-    if (car.inspection_expiry) {
-      const expiryDate = new Date(car.inspection_expiry);
-      if (expiryDate <= in15Days && expiryDate > now) {
-        const created = await createExpiryNotification(
-          `${car.brand} ${car.model}`,
-          "inspection_expiry",
-          `الفحص التقني للسيارة ينتهي في ${expiryDate.toLocaleDateString("ar-DZ")}`,
-          expiryDate,
-          car.id
-        );
-        if (created) notificationsCreated++;
+        if (isWithin15Days) {
+          // Date is within 15 days → create notification if not exists
+          if (!existingId) {
+            const created = await createExpiryNotification(
+              subject,
+              category,
+              `${label} ينتهي في ${exp.toLocaleDateString("ar-DZ")}`,
+              exp,
+              car.id,
+            );
+            if (created) notificationsCreated++;
+          }
+        } else if (existingId) {
+          // Date is safe (> 15 days) but notification exists → DELETE it
+          const { error } = await supabase
+            .from("notifications")
+            .delete()
+            .eq("id", existingId);
+          if (!error) notificationsDeleted++;
+        }
       }
     }
   }
@@ -126,47 +138,34 @@ export async function checkExpiryDates(): Promise<number> {
   for (const customer of customers ?? []) {
     if (customer.driver_license_expiry) {
       const expiryDate = new Date(customer.driver_license_expiry);
+      const subject = `${customer.first_name} ${customer.last_name}`;
+      const existingId = existingMap.get(`${customer.id}|license_expiry`);
+
       if (expiryDate <= in30Days && expiryDate > now) {
-        const created = await createExpiryNotification(
-          `${customer.first_name} ${customer.last_name}`,
-          "license_expiry",
-          `رخصة القيادة للعميل تنتهي في ${expiryDate.toLocaleDateString("ar-DZ")}`,
-          expiryDate
-        );
-        if (created) notificationsCreated++;
+        if (!existingId) {
+          const created = await createExpiryNotification(
+            subject,
+            "license_expiry",
+            `رخصة القيادة للعميل تنتهي في ${expiryDate.toLocaleDateString("ar-DZ")}`,
+            expiryDate,
+            customer.id,
+          );
+          if (created) notificationsCreated++;
+        }
+      } else if (existingId) {
+        // License is safe → DELETE notification
+        const { error } = await supabase
+          .from("notifications")
+          .delete()
+          .eq("id", existingId);
+        if (!error) notificationsDeleted++;
       }
-    }
-  }
-
-  // 3. Check overdue rentals
-  const nowIso = now.toISOString();
-  const { data: overdueRentals } = await supabase
-    .from("rentals")
-    .select("id, customer_id, car_id, end_date, customer:customers(first_name, last_name), car:cars(brand, model)")
-    .eq("status", "active")
-    .lt("end_date", nowIso)
-    .returns<{ id: string; customer_id: string; car_id: string; end_date: string; customer: { first_name: string; last_name: string }[] | { first_name: string; last_name: string }; car: { brand: string; model: string }[] | { brand: string; model: string } }[]>();
-
-  for (const rental of overdueRentals ?? []) {
-    const cust = Array.isArray(rental.customer) ? rental.customer[0] : rental.customer;
-    const car = Array.isArray(rental.car) ? rental.car[0] : rental.car;
-    if (cust && car) {
-      const created = await createExpiryNotification(
-        `${cust.first_name} ${cust.last_name} - ${car.brand} ${car.model}`,
-        "rental_overdue",
-        `الكراء متأخر — تاريخ الانتهاء كان ${new Date(rental.end_date).toLocaleDateString("ar-DZ")}`,
-        now
-      );
-      if (created) notificationsCreated++;
     }
   }
 
   return notificationsCreated;
 }
 
-/**
- * Create a notification if one doesn't already exist for this car/category combo today
- */
 async function createExpiryNotification(
   subject: string,
   category: NotificationCategory,
@@ -174,7 +173,7 @@ async function createExpiryNotification(
   expiryDate: Date,
   carId?: string
 ): Promise<boolean> {
-  // Check if similar notification already exists (any time, not just today)
+  // Check if similar unread notification already exists (any time)
   const { data: existing } = await supabase
     .from("notifications")
     .select("id")
@@ -185,7 +184,7 @@ async function createExpiryNotification(
 
   if (existing && existing.length > 0) return false;
 
-  // Create notification with carId in metadata
+  // Create notification
   const { error } = await supabase.from("notifications").insert({
     title: `${categoryLabels[category]} — ${subject}`,
     message,
@@ -197,9 +196,6 @@ async function createExpiryNotification(
   return !error;
 }
 
-/**
- * Create a rental notification
- */
 export async function createRentalNotification(
   type: "rental_created" | "rental_returned" | "rental_cancelled",
   subject: string,
