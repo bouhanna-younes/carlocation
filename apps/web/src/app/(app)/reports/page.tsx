@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
-import { TrendingUp, Car, Users, AlertCircle, Wrench, ShieldAlert } from "lucide-react";
+import { TrendingUp, Car, Users, Wrench, ShieldAlert } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -49,17 +49,6 @@ function ChartSkeleton() {
   return <div className="h-72 bg-surface-hover/50 rounded-xl animate-pulse" />;
 }
 
-function ErrorState({ message }: { message: string }) {
-  return (
-    <div className="text-center py-12">
-      <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-danger/10 mb-3">
-        <AlertCircle className="w-6 h-6 text-danger" />
-      </div>
-      <p className="text-danger text-sm">{message}</p>
-    </div>
-  );
-}
-
 export default function ReportsPage() {
   const { isManager } = useRole();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -67,66 +56,124 @@ export default function ReportsPage() {
   const {
     data: monthlyRevenue,
     isLoading: loadingRevenue,
-    error: errorRevenue,
   } = useQuery<MonthlyRevenue[]>({
     queryKey: ["reports-monthly-revenue", selectedYear],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("monthly_revenue", { p_year: selectedYear });
-      if (error) throw new Error(error.message);
-      return (((data ?? []) as unknown) as Array<{ month_label: string; revenue: number }>).map((r) => ({
-        month: r.month_label,
-        revenue: r.revenue ?? 0,
-      }));
+      if (!error && data) {
+        return (((data as unknown) as Array<{ month_label: string; revenue: number }>).map((r) => ({
+          month: r.month_label,
+          revenue: r.revenue ?? 0,
+        })));
+      }
+      // Fallback: client-side aggregation
+      const yearStart = new Date(selectedYear, 0, 1).toISOString();
+      const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59).toISOString();
+      const { data: rentals, error: rErr } = await supabase
+        .from("rentals")
+        .select("total_amount, created_at")
+        .gte("created_at", yearStart)
+        .lte("created_at", yearEnd)
+        .returns<{ total_amount: number | null; created_at: string }[]>();
+      if (rErr) return [];
+      const monthNames = ["جانفي", "فيفري", "مارس", "أفريل", "ماي", "جوان", "جويلية", "أوت", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+      return monthNames.map((month, i) => {
+        const mStart = new Date(selectedYear, i, 1);
+        const mEnd = new Date(selectedYear, i + 1, 0);
+        const revenue = (rentals ?? [])
+          .filter((r) => {
+            const d = new Date(r.created_at);
+            return d >= mStart && d <= mEnd;
+          })
+          .reduce((s, r) => s + (r.total_amount ?? 0), 0);
+        return { month, revenue };
+      });
     },
   });
 
   const {
     data: topCars,
     isLoading: loadingCars,
-    error: errorCars,
   } = useQuery<TopCar[]>({
     queryKey: ["reports-top-cars"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("top_cars", { p_limit: 5 });
-      if (error) throw new Error(error.message);
-      return ((data ?? []) as Array<{
-        car_id: string;
-        brand: string;
-        model: string;
-        plate_number: string;
-        total_revenue: number;
-        rentals_count: number;
-      }>).map((r) => ({
-        id: r.car_id,
-        brand: r.brand,
-        model: r.model,
-        rentalCount: r.rentals_count ?? 0,
-        revenue: r.total_revenue ?? 0,
-      }));
+      if (!error && data) {
+        return ((data as Array<{
+          car_id: string;
+          brand: string;
+          model: string;
+          plate_number: string;
+          total_revenue: number;
+          rentals_count: number;
+        }>).map((r) => ({
+          id: r.car_id,
+          brand: r.brand,
+          model: r.model,
+          rentalCount: r.rentals_count ?? 0,
+          revenue: r.total_revenue ?? 0,
+        })));
+      }
+      // Fallback: client-side aggregation
+      const { data: rentals, error: rErr } = await supabase
+        .from("rentals")
+        .select("car_id, total_amount, car:cars(brand, model)")
+        .returns<{ car_id: string; total_amount: number | null; car: { brand: string; model: string } | null }[]>();
+      if (rErr) return [];
+      const map = new Map<string, { brand: string; model: string; rentalCount: number; revenue: number }>();
+      for (const r of rentals ?? []) {
+        const car = Array.isArray(r.car) ? r.car[0] : r.car;
+        const existing = map.get(r.car_id) ?? { brand: car?.brand ?? "", model: car?.model ?? "", rentalCount: 0, revenue: 0 };
+        existing.rentalCount++;
+        existing.revenue += r.total_amount ?? 0;
+        map.set(r.car_id, existing);
+      }
+      return Array.from(map.entries())
+        .map(([id, v]) => ({ id, brand: v.brand, model: v.model, rentalCount: v.rentalCount, revenue: v.revenue }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 5);
     },
   });
 
   const {
     data: topCustomers,
     isLoading: loadingCustomers,
-    error: errorCustomers,
   } = useQuery<TopCustomer[]>({
     queryKey: ["reports-top-customers"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("top_customers", { p_limit: 10 });
-      if (error) throw new Error(error.message);
-      return ((data ?? []) as Array<{
-        customer_id: string;
-        first_name: string;
-        last_name: string;
-        total_spent: number;
-        rentals_count: number;
-      }>).map((r) => ({
-        id: r.customer_id,
-        name: `${r.first_name} ${r.last_name}`,
-        rentalCount: r.rentals_count ?? 0,
-        totalSpent: r.total_spent ?? 0,
-      }));
+      if (!error && data) {
+        return ((data as Array<{
+          customer_id: string;
+          first_name: string;
+          last_name: string;
+          total_spent: number;
+          rentals_count: number;
+        }>).map((r) => ({
+          id: r.customer_id,
+          name: `${r.first_name} ${r.last_name}`,
+          rentalCount: r.rentals_count ?? 0,
+          totalSpent: r.total_spent ?? 0,
+        })));
+      }
+      // Fallback: client-side aggregation
+      const { data: rentals, error: rErr } = await supabase
+        .from("rentals")
+        .select("customer_id, total_amount, customer:customers(first_name, last_name)")
+        .returns<{ customer_id: string; total_amount: number | null; customer: { first_name: string; last_name: string } | null }[]>();
+      if (rErr) return [];
+      const map = new Map<string, { name: string; rentalCount: number; totalSpent: number }>();
+      for (const r of rentals ?? []) {
+        const cust = Array.isArray(r.customer) ? r.customer[0] : r.customer;
+        const existing = map.get(r.customer_id) ?? { name: `${cust?.first_name ?? ""} ${cust?.last_name ?? ""}`, rentalCount: 0, totalSpent: 0 };
+        existing.rentalCount++;
+        existing.totalSpent += r.total_amount ?? 0;
+        map.set(r.customer_id, existing);
+      }
+      return Array.from(map.entries())
+        .map(([id, v]) => ({ id, name: v.name, rentalCount: v.rentalCount, totalSpent: v.totalSpent }))
+        .sort((a, b) => b.totalSpent - a.totalSpent)
+        .slice(0, 10);
     },
   });
 
@@ -259,8 +306,6 @@ export default function ReportsPage() {
           </div>
           {loadingRevenue ? (
             <ChartSkeleton />
-          ) : errorRevenue ? (
-            <ErrorState message="خطأ في تحميل بيانات الإيراد" />
           ) : !monthlyRevenue?.length ? (
             <div className="text-center py-12">
               <TrendingUp className="w-8 h-8 text-muted mx-auto mb-2 opacity-50" />
@@ -358,8 +403,6 @@ export default function ReportsPage() {
         </div>
         {loadingCars ? (
           <ChartSkeleton />
-        ) : errorCars ? (
-          <ErrorState message="خطأ في تحميل بيانات السيارات" />
         ) : !topCars?.length ? (
           <div className="text-center py-12">
             <Car className="w-8 h-8 text-muted mx-auto mb-2 opacity-50" />
@@ -421,8 +464,6 @@ export default function ReportsPage() {
               />
             ))}
           </div>
-        ) : errorCustomers ? (
-          <ErrorState message="خطأ في تحميل بيانات العملاء" />
         ) : !topCustomers?.length ? (
           <div className="text-center py-8">
             <Users className="w-8 h-8 text-muted mx-auto mb-2 opacity-50" />

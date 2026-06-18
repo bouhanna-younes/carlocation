@@ -296,28 +296,49 @@ export default function CustomersPage() {
   });
 
   // Single RPC replaces the N+1 loop (was 2 requests per customer).
+  // Falls back to client-side aggregation if RPC not yet deployed.
   const { data: customerStats } = useQuery({
     queryKey: ["customer-stats"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("customer_stats");
-      if (error) throw new Error(error.message);
+      const { data: rpcData, error: rpcError } =
+        await supabase.rpc("customer_stats");
+      if (!rpcError && rpcData) {
+        const stats: Record<string, { rentalCount: number; totalSpent: number; activeRentals: number }> = {};
+        for (const row of (rpcData as unknown) as Array<{
+          customer_id: string;
+          total_rentals: number;
+          active_rentals: number;
+          completed_rentals: number;
+          total_spent: number;
+          outstanding: number;
+        }>) {
+          stats[row.customer_id] = {
+            rentalCount: row.total_rentals ?? 0,
+            totalSpent: row.total_spent ?? 0,
+            activeRentals: row.active_rentals ?? 0,
+          };
+        }
+        return stats;
+      }
+
+      // Fallback: client-side aggregation from rentals table
+      const { data: rentals, error } = await supabase
+        .from("rentals")
+        .select("customer_id, status, total_amount")
+        .returns<{ customer_id: string; status: string; total_amount: number | null }[]>();
+      if (error) return {};
       const stats: Record<string, { rentalCount: number; totalSpent: number; activeRentals: number }> = {};
-      for (const row of ((data ?? []) as unknown) as Array<{
-        customer_id: string;
-        total_rentals: number;
-        active_rentals: number;
-        completed_rentals: number;
-        total_spent: number;
-        outstanding: number;
-      }>) {
-        stats[row.customer_id] = {
-          rentalCount: row.total_rentals ?? 0,
-          totalSpent: row.total_spent ?? 0,
-          activeRentals: row.active_rentals ?? 0,
-        };
+      for (const r of rentals ?? []) {
+        if (!stats[r.customer_id]) {
+          stats[r.customer_id] = { rentalCount: 0, totalSpent: 0, activeRentals: 0 };
+        }
+        stats[r.customer_id].rentalCount++;
+        stats[r.customer_id].totalSpent += r.total_amount ?? 0;
+        if (r.status === "active") stats[r.customer_id].activeRentals++;
       }
       return stats;
     },
+    retry: 1,
   });
 
   const searchFn = useCallback((c: Customer, search: string) => {

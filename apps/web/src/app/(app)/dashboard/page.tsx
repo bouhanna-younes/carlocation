@@ -19,7 +19,6 @@ import {
   DollarSign,
   ActivityIcon as ActivityIconLucide,
   BarChart3,
-  AlertCircle,
 } from "lucide-react";
 import {
   XAxis,
@@ -177,19 +176,6 @@ function ChartTooltip({
   );
 }
 
-/* ─── Error State ─── */
-function ErrorState({ message }: { message?: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-muted">
-      <AlertCircle className="w-12 h-12 mb-3 opacity-30" />
-      <p className="text-sm font-medium">
-        {message || "حدث خطأ أثناء تحميل البيانات"}
-      </p>
-      <p className="text-xs text-muted/60 mt-1">تأكد من تشغيل الخادم</p>
-    </div>
-  );
-}
-
 /* ═══════════════ MAIN ═══════════════ */
 export default function DashboardPage() {
   // Realtime updates
@@ -207,46 +193,159 @@ export default function DashboardPage() {
     staleTime: 3600000, // Consider fresh for 1 hour
   });
 
-  const {
-    data: kpis,
-    isLoading,
-    error: kpisError,
-  } = useQuery<DashboardKPIs>({
+  const { data: kpis, isLoading: kpisLoading } = useQuery<DashboardKPIs>({
     queryKey: ["dashboard-kpis"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("dashboard_kpis");
-      if (error) throw new Error(error.message);
-      const k = (data ?? {}) as unknown as Record<string, number>;
-      const totalCars = k.totalCars ?? 0;
-      const rentedCars = k.rentedCars ?? 0;
-      const revenueThisMonth = k.revenueThisMonth ?? 0;
-      const revenueLastMonth = k.revenueLastMonth ?? 0;
-      const monthlyRevenueChange =
-        revenueLastMonth > 0
-          ? Math.round(((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100)
-          : 0;
+      // Try the server-side RPC first (migration 007).
+      const { data: rpcData, error: rpcError } =
+        await supabase.rpc("dashboard_kpis");
+      if (!rpcError && rpcData) {
+        const k = rpcData as unknown as Record<string, number>;
+        const totalCars = k.totalCars ?? 0;
+        const rentedCars = k.rentedCars ?? 0;
+        const revenueThisMonth = k.revenueThisMonth ?? 0;
+        const revenueLastMonth = k.revenueLastMonth ?? 0;
+        return {
+          totalCars,
+          availableCars: k.availableCars ?? 0,
+          rentedCars,
+          maintenanceCars: k.maintenanceCars ?? 0,
+          totalCustomers: k.totalCustomers ?? 0,
+          blacklistedCustomers: k.blacklistedCustomers ?? 0,
+          activeRentals: k.activeRentals ?? 0,
+          overdueRentals: k.overdueRentals ?? 0,
+          revenueThisMonth,
+          revenueLastMonth,
+          revenueYtd: k.revenueYtd ?? 0,
+          openInvoicesCount: k.openInvoicesCount ?? 0,
+          openInvoicesAmount: k.openInvoicesAmount ?? 0,
+          pendingMaintenance: k.pendingMaintenance ?? 0,
+          monthlyRevenue: revenueThisMonth,
+          monthlyRevenueChange:
+            revenueLastMonth > 0
+              ? Math.round(
+                  ((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100,
+                )
+              : 0,
+          activeMaintenance: k.pendingMaintenance ?? 0,
+          occupancyRate:
+            totalCars > 0 ? Math.round((rentedCars / totalCars) * 100) : 0,
+          totalRevenueYTD: k.revenueYtd ?? 0,
+        };
+      }
+
+      // Fallback: client-side aggregation (if RPC not yet deployed).
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      const yearStart = new Date(now.getFullYear(), 0, 1);
+
+      const [
+        carsRes,
+        availableRes,
+        rentedRes,
+        maintCarRes,
+        customersRes,
+        blacklistRes,
+        activeRentalsRes,
+        overdueRes,
+        revenueMonthRes,
+        revenueLastMonthRes,
+        revenueYtdRes,
+        openInvoicesRes,
+        pendingMaintRes,
+      ] = await Promise.all([
+        supabase.from("cars").select("*", { head: true, count: "exact" }),
+        supabase
+          .from("cars")
+          .select("*", { head: true, count: "exact" })
+          .eq("status", "available"),
+        supabase
+          .from("cars")
+          .select("*", { head: true, count: "exact" })
+          .eq("status", "rented"),
+        supabase
+          .from("cars")
+          .select("*", { head: true, count: "exact" })
+          .eq("status", "maintenance"),
+        supabase.from("customers").select("*", { head: true, count: "exact" }),
+        supabase
+          .from("customers")
+          .select("*", { head: true, count: "exact" })
+          .eq("is_blacklisted", true),
+        supabase
+          .from("rentals")
+          .select("*", { head: true, count: "exact" })
+          .eq("status", "active"),
+        supabase
+          .from("rentals")
+          .select("*", { head: true, count: "exact" })
+          .eq("status", "active")
+          .lt("end_date", now.toISOString().split("T")[0]),
+        supabase
+          .from("rentals")
+          .select("total_amount")
+          .gte("created_at", monthStart.toISOString()),
+        supabase
+          .from("rentals")
+          .select("total_amount")
+          .gte("created_at", lastMonthStart.toISOString())
+          .lte("created_at", lastMonthEnd.toISOString()),
+        supabase
+          .from("rentals")
+          .select("total_amount")
+          .gte("created_at", yearStart.toISOString()),
+        supabase
+          .from("invoices")
+          .select("amount")
+          .eq("status", "unpaid"),
+        supabase
+          .from("maintenance")
+          .select("*", { head: true, count: "exact" })
+          .in("status", ["pending", "in_progress"]),
+      ]);
+
+      const totalCars = carsRes.count ?? 0;
+      const rentedCars = rentedRes.count ?? 0;
+      const revenueThisMonth =
+        revenueMonthRes.data?.reduce((s, r) => s + (r.total_amount ?? 0), 0) ?? 0;
+      const revenueLastMonth =
+        revenueLastMonthRes.data?.reduce((s, r) => s + (r.total_amount ?? 0), 0) ?? 0;
+      const openInvoicesAmount =
+        openInvoicesRes.data?.reduce((s, r) => s + (r.amount ?? 0), 0) ?? 0;
+
       return {
         totalCars,
-        availableCars: k.availableCars ?? 0,
+        availableCars: availableRes.count ?? 0,
         rentedCars,
-        maintenanceCars: k.maintenanceCars ?? 0,
-        totalCustomers: k.totalCustomers ?? 0,
-        blacklistedCustomers: k.blacklistedCustomers ?? 0,
-        activeRentals: k.activeRentals ?? 0,
-        overdueRentals: k.overdueRentals ?? 0,
+        maintenanceCars: maintCarRes.count ?? 0,
+        totalCustomers: customersRes.count ?? 0,
+        blacklistedCustomers: blacklistRes.count ?? 0,
+        activeRentals: activeRentalsRes.count ?? 0,
+        overdueRentals: overdueRes.count ?? 0,
         revenueThisMonth,
         revenueLastMonth,
-        revenueYtd: k.revenueYtd ?? 0,
-        openInvoicesCount: k.openInvoicesCount ?? 0,
-        openInvoicesAmount: k.openInvoicesAmount ?? 0,
-        pendingMaintenance: k.pendingMaintenance ?? 0,
+        revenueYtd:
+          revenueYtdRes.data?.reduce((s, r) => s + (r.total_amount ?? 0), 0) ?? 0,
+        openInvoicesCount: openInvoicesRes.data?.length ?? 0,
+        openInvoicesAmount,
+        pendingMaintenance: pendingMaintRes.count ?? 0,
         monthlyRevenue: revenueThisMonth,
-        monthlyRevenueChange,
-        activeMaintenance: k.pendingMaintenance ?? 0,
-        occupancyRate: totalCars > 0 ? Math.round((rentedCars / totalCars) * 100) : 0,
-        totalRevenueYTD: k.revenueYtd ?? 0,
+        monthlyRevenueChange:
+          revenueLastMonth > 0
+            ? Math.round(
+                ((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100,
+              )
+            : 0,
+        activeMaintenance: pendingMaintRes.count ?? 0,
+        occupancyRate:
+          totalCars > 0 ? Math.round((rentedCars / totalCars) * 100) : 0,
+        totalRevenueYTD:
+          revenueYtdRes.data?.reduce((s, r) => s + (r.total_amount ?? 0), 0) ?? 0,
       };
     },
+    retry: 1,
   });
 
   const { data: revenueChart } = useQuery<RevenueData[]>({
@@ -507,6 +606,8 @@ export default function DashboardPage() {
     }));
   }, [upcomingReturns, now]);
 
+  const isLoading = kpisLoading && !kpis;
+
   /* ─── Loading ─── */
   if (isLoading) {
     return (
@@ -526,19 +627,6 @@ export default function DashboardPage() {
           <div className="lg:col-span-2 rounded-2xl bg-surface border border-border p-6 h-80 animate-pulse" />
           <div className="rounded-2xl bg-surface border border-border p-6 h-80 animate-pulse" />
         </div>
-      </div>
-    );
-  }
-
-  /* ─── Error ─── */
-  if (kpisError) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">لوحة التحكم</h1>
-          <p className="text-sm text-muted mt-1">نظرة عامة على أداء الأسطول</p>
-        </div>
-        <ErrorState />
       </div>
     );
   }
