@@ -1,27 +1,30 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 
-/**
- * Supabase Realtime hook — subscribes to postgres_changes on a table
- * and invalidates related React Query keys automatically.
- *
- * Uses a STABLE channel name per table so that multiple components
- * subscribing to the same table share one connection (Supabase dedupes
- * channels by name within a single client).
- */
-const DASHBOARD_RELATED = new Set(["cars", "rentals", "maintenance", "customers", "invoices", "notifications"]);
+const DASHBOARD_RELATED = new Set([
+  "cars",
+  "rentals",
+  "maintenance",
+  "customers",
+  "invoices",
+  "notifications",
+]);
+
+let channelCounter = 0;
 
 export function useRealtime(table: string) {
   const queryClient = useQueryClient();
   const statusRef = useRef<string>("connecting");
+  const reactId = useId();
 
   useEffect(() => {
-    // Stable channel name — Supabase dedupes identical channel names within a client.
+    const channelName = `rt:${table}:${reactId}:${channelCounter++}`;
+
     const channel = supabase
-      .channel(`rt:${table}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table },
@@ -34,13 +37,17 @@ export function useRealtime(table: string) {
       )
       .subscribe((status: string) => {
         statusRef.current = status;
-        if (status === "error" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          console.error(`[realtime] channel 'rt:${table}' error`);
+        if (
+          status === "error" ||
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT"
+        ) {
+          console.error(`[realtime] channel '${channelName}' error`);
         }
       });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [table, queryClient]);
+  }, [table, queryClient, reactId]);
 }
