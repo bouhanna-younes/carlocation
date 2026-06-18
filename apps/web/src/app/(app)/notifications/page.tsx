@@ -20,6 +20,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { timeAgo } from "@/lib/utils";
 import { useRealtime } from "@/hooks/use-realtime";
+import { checkExpiryDates } from "@/lib/notifications";
 
 type FilterType = "all" | "unread" | "read";
 
@@ -68,6 +69,13 @@ export default function NotificationsPage() {
 
   // Realtime updates
   useRealtime("notifications");
+
+  // Sync expiry dates on page load
+  useQuery({
+    queryKey: ["expiry-sync"],
+    queryFn: checkExpiryDates,
+    staleTime: 300000, // 5 minutes
+  });
 
   const {
     data: notifications,
