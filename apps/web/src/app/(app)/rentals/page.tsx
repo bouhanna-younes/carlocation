@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { mapRental, mapCustomer, mapAvailableCar, type Rental, type Customer, type AvailableCar } from "@/lib/mappers";
+import { createRentalNotification } from "@/lib/notifications";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { SortHeader } from "@/components/shared/sort-header";
@@ -215,6 +216,32 @@ export default function RentalsPage() {
         .from("cars") as any)
         .update({ status: "rented" })
         .eq("id", data.carId);
+
+      // Fetch car and customer names for notification
+      const { data: carRow } = await supabase
+        .from("cars")
+        .select("brand, model")
+        .eq("id", data.carId)
+        .single();
+      const { data: custRow } = await supabase
+        .from("customers")
+        .select("first_name, last_name")
+        .eq("id", data.customerId)
+        .single();
+
+      const carInfo = carRow as { brand: string; model: string } | null;
+      const custInfo = custRow as { first_name: string; last_name: string } | null;
+
+      const carName = carInfo ? `${carInfo.brand} ${carInfo.model}` : "";
+      const custName = custInfo
+        ? `${custInfo.first_name} ${custInfo.last_name}`
+        : "";
+
+      await createRentalNotification(
+        "rental_created",
+        `${custName} — ${carName}`,
+        `تم إنشاء كراء جديد للعميل ${custName} للسيارة ${carName}`,
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rentals"] });
@@ -259,12 +286,31 @@ export default function RentalsPage() {
           .eq("id", rental.carId);
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["rentals"] });
       queryClient.invalidateQueries({ queryKey: ["available-cars"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["recent-rentals"] });
       queryClient.invalidateQueries({ queryKey: ["revenue-chart"] });
+
+      // Create return notification
+      if (returnRental?.carId) {
+        const { data: carRow } = await supabase
+          .from("cars")
+          .select("brand, model")
+          .eq("id", returnRental.carId)
+          .single();
+        const carData = carRow as { brand: string; model: string } | null;
+        const carName = carData
+          ? `${carData.brand} ${carData.model}`
+          : returnRental.carBrand || "";
+        await createRentalNotification(
+          "rental_returned",
+          carName,
+          `تم إرجاع السيارة ${carName}`,
+        );
+      }
+
       toast.success("تم إرجاع السيارة بنجاح");
       setReturnRental(null);
     },
@@ -308,11 +354,30 @@ export default function RentalsPage() {
           .eq("id", rental.carId);
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["rentals"] });
       queryClient.invalidateQueries({ queryKey: ["available-cars"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["recent-rentals"] });
+
+      // Create cancel notification
+      if (cancelRental?.carId) {
+        const { data: carRow } = await supabase
+          .from("cars")
+          .select("brand, model")
+          .eq("id", cancelRental.carId)
+          .single();
+        const carData = carRow as { brand: string; model: string } | null;
+        const carName = carData
+          ? `${carData.brand} ${carData.model}`
+          : cancelRental.carBrand || "";
+        await createRentalNotification(
+          "rental_cancelled",
+          carName,
+          `تم إلغاء كراء السيارة ${carName}`,
+        );
+      }
+
       toast.success("تم إلغاء الكراء بنجاح");
       setCancelRental(null);
     },
