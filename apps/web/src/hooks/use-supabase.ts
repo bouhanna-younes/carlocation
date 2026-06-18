@@ -3,20 +3,31 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 
-// =====================================================
-// GENERIC QUERY HOOK
-// =====================================================
-export function useSupabaseQuery(
+/** Tables that have a `created_at` column (used for default ordering). */
+const TABLES_WITH_CREATED_AT = [
+  "profiles", "cars", "customers", "rentals", "maintenance",
+  "settings", "notifications", "invoices",
+];
+
+export interface SupabaseQueryOptions {
+  page?: number;
+  limit?: number;
+  orderBy?: string;
+  ascending?: boolean;
+  filters?: Record<string, unknown>;
+  select?: string;
+  enabled?: boolean;
+  staleTime?: number;
+}
+
+/** Stable query-key serialization (prevents refetch storms from inline option objects). */
+function serializeQueryKey(table: string, options?: SupabaseQueryOptions) {
+  return [table, JSON.stringify(options ?? {})];
+}
+
+export function useSupabaseQuery<T = unknown[]>(
   table: string,
-  options?: {
-    page?: number;
-    limit?: number;
-    orderBy?: string;
-    ascending?: boolean;
-    filters?: Record<string, unknown>;
-    select?: string;
-    enabled?: boolean;
-  },
+  options?: SupabaseQueryOptions,
 ) {
   const page = options?.page ?? 1;
   const limit = options?.limit ?? 100;
@@ -24,8 +35,9 @@ export function useSupabaseQuery(
   const to = from + limit - 1;
 
   return useQuery({
-    queryKey: [table, options],
+    queryKey: serializeQueryKey(table, options),
     enabled: options?.enabled ?? true,
+    staleTime: options?.staleTime,
     queryFn: async () => {
       let query = supabase
         .from(table)
@@ -33,10 +45,8 @@ export function useSupabaseQuery(
         .range(from, to);
 
       if (options?.orderBy) {
-        query = query.order(options.orderBy, {
-          ascending: options.ascending ?? false,
-        });
-      } else {
+        query = query.order(options.orderBy, { ascending: options?.ascending ?? false });
+      } else if (TABLES_WITH_CREATED_AT.includes(table)) {
         query = query.order("created_at", { ascending: false });
       }
 
@@ -52,7 +62,7 @@ export function useSupabaseQuery(
       if (error) throw new Error(error.message);
 
       return {
-        data: data ?? [],
+        data: (data ?? []) as T,
         count: count ?? 0,
         page,
         limit,
@@ -62,17 +72,13 @@ export function useSupabaseQuery(
   });
 }
 
-// =====================================================
-// GENERIC MUTATION HOOKS
-// =====================================================
 export function useSupabaseInsert(table: string) {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (item: Record<string, unknown>) => {
       const { data, error } = await supabase
         .from(table)
-        .insert(item as any)
+        .insert(item as never)
         .select()
         .single();
       if (error) throw new Error(error.message);
@@ -86,18 +92,11 @@ export function useSupabaseInsert(table: string) {
 
 export function useSupabaseUpdate(table: string) {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async ({
-      id,
-      updates,
-    }: {
-      id: string;
-      updates: Record<string, unknown>;
-    }) => {
-      const { data, error } = await (supabase
-        .from(table) as any)
-        .update(updates)
+    mutationFn: async ({ id, updates }: { id: string; updates: Record<string, unknown> }) => {
+      const { data, error } = await supabase
+        .from(table)
+        .update(updates as never)
         .eq("id", id)
         .select()
         .single();
@@ -112,7 +111,6 @@ export function useSupabaseUpdate(table: string) {
 
 export function useSupabaseDelete(table: string) {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from(table).delete().eq("id", id);

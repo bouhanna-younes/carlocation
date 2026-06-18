@@ -10,13 +10,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-gradient-to-br from-primary to-emerald-600 text-white hover:shadow-lg hover:shadow-primary/30 focus:ring-primary",
+          "bg-primary text-white hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 focus:ring-primary",
         secondary:
-          "bg-gradient-to-br from-secondary to-indigo-600 text-white hover:shadow-lg hover:shadow-secondary/30 focus:ring-secondary",
+          "bg-secondary text-white hover:bg-secondary/90 hover:shadow-lg hover:shadow-secondary/30 focus:ring-secondary",
         danger:
-          "bg-gradient-to-br from-danger to-red-600 text-white hover:shadow-lg hover:shadow-danger/30 focus:ring-danger",
+          "bg-danger text-white hover:bg-danger/90 hover:shadow-lg hover:shadow-danger/30 focus:ring-danger",
         warning:
-          "bg-gradient-to-br from-warning to-amber-600 text-white hover:shadow-lg hover:shadow-warning/30 focus:ring-warning",
+          "bg-warning text-white hover:bg-warning/90 hover:shadow-lg hover:shadow-warning/30 focus:ring-warning",
         ghost:
           "bg-transparent text-muted hover:bg-surface-hover hover:text-foreground focus:ring-muted",
         outline:
@@ -59,6 +59,7 @@ const Button = forwardRef<
       iconRight,
       children,
       disabled,
+      type = "button",
       ...props
     },
     ref,
@@ -66,6 +67,8 @@ const Button = forwardRef<
     return (
       <button
         ref={ref}
+        type={type}
+        aria-busy={loading || undefined}
         className={cn(buttonVariants({ variant, size, fullWidth, className }))}
         disabled={disabled || loading}
         {...props}

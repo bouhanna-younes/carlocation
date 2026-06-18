@@ -1,70 +1,39 @@
+import type { CarStatus, Transmission, MaintenanceStatus, Priority } from "@/lib/supabase/database.types";
+
+type StatusStyle = { label: string; colorClass: string };
+
+const SEMAPHORE = {
+  emerald: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  blue: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  amber: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  red: "bg-red-500/15 text-red-400 border-red-500/30",
+  muted: "bg-muted/15 text-muted border-muted/30",
+  orange: "bg-orange-500/15 text-orange-400 border-orange-500/30",
+} as const;
+
 export const inputClass =
-  "w-full bg-input/80 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all duration-200";
+  "w-full bg-input/80 border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-colors duration-200";
 
-export const carStatusMap: Record<
-  string,
-  { label: string; colorClass: string }
-> = {
-  available: {
-    label: "متاحة",
-    colorClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  },
-  rented: {
-    label: "مستأجرة",
-    colorClass: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  },
-  maintenance: {
-    label: "صيانة",
-    colorClass: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  },
-  out_of_service: {
-    label: "خارج الخدمة",
-    colorClass: "bg-red-500/15 text-red-400 border-red-500/30",
-  },
+export const carStatusMap: Record<CarStatus, StatusStyle> = {
+  available: { label: "متاحة", colorClass: SEMAPHORE.emerald },
+  rented: { label: "مستأجرة", colorClass: SEMAPHORE.blue },
+  maintenance: { label: "صيانة", colorClass: SEMAPHORE.amber },
+  out_of_service: { label: "خارج الخدمة", colorClass: SEMAPHORE.red },
 };
 
-export const rentalStatusMap: Record<
-  string,
-  { label: string; colorClass: string }
-> = {
-  active: {
-    label: "نشط",
-    colorClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  },
-  completed: {
-    label: "مكتمل",
-    colorClass: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  },
-  overdue: {
-    label: "متأخر",
-    colorClass: "bg-red-500/15 text-red-400 border-red-500/30",
-  },
-  cancelled: {
-    label: "ملغى",
-    colorClass: "bg-muted/15 text-muted border-muted/30",
-  },
+export const rentalStatusMap: Record<string, StatusStyle> = {
+  active: { label: "نشط", colorClass: SEMAPHORE.emerald },
+  completed: { label: "مكتمل", colorClass: SEMAPHORE.blue },
+  overdue: { label: "متأخر", colorClass: SEMAPHORE.red },
+  cancelled: { label: "ملغى", colorClass: SEMAPHORE.muted },
+  reserved: { label: "محجوز", colorClass: SEMAPHORE.amber },
 };
 
-export const maintenanceStatusMap: Record<
-  string,
-  { label: string; colorClass: string }
-> = {
-  pending: {
-    label: "قيد الانتظار",
-    colorClass: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  },
-  in_progress: {
-    label: "قيد التنفيذ",
-    colorClass: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  },
-  completed: {
-    label: "مكتمل",
-    colorClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  },
-  cancelled: {
-    label: "ملغى",
-    colorClass: "bg-muted/15 text-muted border-muted/30",
-  },
+export const maintenanceStatusMap: Record<MaintenanceStatus, StatusStyle> = {
+  pending: { label: "قيد الانتظار", colorClass: SEMAPHORE.amber },
+  in_progress: { label: "قيد التنفيذ", colorClass: SEMAPHORE.blue },
+  completed: { label: "مكتمل", colorClass: SEMAPHORE.emerald },
+  cancelled: { label: "ملغى", colorClass: SEMAPHORE.muted },
 };
 
 export const maintenanceTypeMap: Record<string, string> = {
@@ -74,6 +43,13 @@ export const maintenanceTypeMap: Record<string, string> = {
   engine_repair: "محرّك",
   inspection: "فحص",
   other: "أخرى",
+};
+
+export const priorityMap: Record<Priority, StatusStyle> = {
+  low: { label: "منخفضة", colorClass: SEMAPHORE.muted },
+  medium: { label: "متوسطة", colorClass: SEMAPHORE.amber },
+  high: { label: "عالية", colorClass: SEMAPHORE.orange },
+  critical: { label: "حرجة", colorClass: SEMAPHORE.red },
 };
 
 export const fuelTypeOptions = [
@@ -97,38 +73,23 @@ export const colorOptions = [
   { value: "أخرى", label: "أخرى" },
 ];
 
-export const transmissionOptions = [
+export const transmissionOptions: { value: Transmission; label: string }[] = [
   { value: "manual", label: "يدوي" },
   { value: "automatic", label: "أوتوماتيكي" },
 ];
 
-export const categoryOptions = [
-  { value: "economy", label: "اقتصادية" },
-  { value: "sedan", label: "سيدان" },
-  { value: "suv", label: "SUV" },
-  { value: "luxury", label: "فاخرة" },
-  { value: "van", label: "فان" },
-  { value: "truck", label: "شاحنة" },
-];
-
-export const priorityMap: Record<
-  string,
-  { label: string; colorClass: string }
-> = {
-  low: {
-    label: "منخفضة",
-    colorClass: "bg-muted/15 text-muted border-muted/30",
-  },
-  medium: {
-    label: "متوسطة",
-    colorClass: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  },
-  high: {
-    label: "عالية",
-    colorClass: "bg-orange-500/15 text-orange-400 border-orange-500/30",
-  },
-  critical: {
-    label: "حرجة",
-    colorClass: "bg-red-500/15 text-red-400 border-red-500/30",
-  },
+export const notificationCategoryLabels: Record<string, string> = {
+  general: "عام",
+  insurance: "تأمين",
+  oil_change: "زيت",
+  vignette: "فيغنيت",
+  inspection: "معاينة",
+  license_expiry: "رخصة قيادة",
+  rental: "كراء",
 };
+
+// Arabic month names (used by reports + dashboard) — single source of truth
+export const ARABIC_MONTHS = [
+  "جانفي", "فيفري", "مارس", "أفريل", "ماي", "جوان",
+  "جويلية", "أوت", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+] as const;

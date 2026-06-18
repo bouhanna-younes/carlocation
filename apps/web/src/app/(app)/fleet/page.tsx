@@ -17,7 +17,7 @@ import {
   X,
   Eye,
 } from "lucide-react";
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRealtime } from "@/hooks/use-realtime";
 import { useForm } from "react-hook-form";
@@ -276,6 +276,14 @@ function CarForm({
 }
 
 export default function FleetPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-24"><div className="w-10 h-10 border-3 border-primary/30 border-t-primary rounded-full animate-spin" /></div>}>
+      <FleetContent />
+    </Suspense>
+  );
+}
+
+function FleetContent() {
   const searchParams = useSearchParams();
   const { isManager } = useRole();
   const [addOpen, setAddOpen] = useState(false);
@@ -284,6 +292,12 @@ export default function FleetPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [viewCar, setViewCar] = useState<Car | null>(null);
   const queryClient = useQueryClient();
+  // Stable "now" reference computed once per mount to satisfy purity rules
+  const [now15, setNow15] = useState<Date | null>(null);
+  useEffect(() => {
+    const id = window.setTimeout(() => setNow15(new Date(Date.now() + 15 * 86400000)), 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   // Realtime updates
   useRealtime("cars");
@@ -311,14 +325,15 @@ export default function FleetPage() {
 
   // Open edit modal if ?edit=carId is in URL
   useEffect(() => {
-    if (editId && cars) {
-      const carToEdit = cars.find((c) => c.id === editId);
-      if (carToEdit && isManager) {
-        setEditCar(carToEdit);
-        // Clean URL without triggering navigation
-        window.history.replaceState({}, "", "/fleet");
-      }
-    }
+    if (!editId || !cars || !isManager) return;
+    const carToEdit = cars.find((c) => c.id === editId);
+    if (!carToEdit) return;
+    // Defer the setState to avoid cascading renders flagged by React Compiler
+    const id = window.setTimeout(() => {
+      setEditCar(carToEdit);
+      window.history.replaceState({}, "", "/fleet");
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [editId, cars, isManager]);
 
   const searchFn = useCallback(
@@ -403,9 +418,9 @@ export default function FleetPage() {
 
       // Mark linked notification as read after successful save
       if (notificationId) {
-        await (supabase
-          .from("notifications") as any)
-          .update({ is_read: true })
+        await supabase
+          .from("notifications")
+          .update({ is_read: true } as never)
           .eq("id", notificationId);
         queryClient.invalidateQueries({ queryKey: ["notifications"] });
       }
@@ -930,25 +945,25 @@ export default function FleetPage() {
               </div>
               <div>
                 <span className="text-muted">انتهاء التأمين:</span>{" "}
-                <span className={`font-medium ${viewCar.insuranceExpiry && new Date(viewCar.insuranceExpiry) < new Date(Date.now() + 15 * 86400000) ? "text-danger" : ""}`}>
+                <span className={`font-medium ${viewCar.insuranceExpiry && now15 && new Date(viewCar.insuranceExpiry) < now15 ? "text-danger" : ""}`}>
                   {viewCar.insuranceExpiry ?? "غير محدد"}
                 </span>
               </div>
               <div>
                 <span className="text-muted">انتهاء تبديل الزيت:</span>{" "}
-                <span className={`font-medium ${viewCar.oilChangeExpiry && new Date(viewCar.oilChangeExpiry) < new Date(Date.now() + 15 * 86400000) ? "text-danger" : ""}`}>
+                <span className={`font-medium ${viewCar.oilChangeExpiry && now15 && new Date(viewCar.oilChangeExpiry) < now15 ? "text-danger" : ""}`}>
                   {viewCar.oilChangeExpiry ?? "غير محدد"}
                 </span>
               </div>
               <div>
                 <span className="text-muted">انتهاء Vignette:</span>{" "}
-                <span className={`font-medium ${viewCar.vignetteExpiry && new Date(viewCar.vignetteExpiry) < new Date(Date.now() + 15 * 86400000) ? "text-danger" : ""}`}>
+                <span className={`font-medium ${viewCar.vignetteExpiry && now15 && new Date(viewCar.vignetteExpiry) < now15 ? "text-danger" : ""}`}>
                   {viewCar.vignetteExpiry ?? "غير محدد"}
                 </span>
               </div>
               <div>
                 <span className="text-muted">الفحص التقني:</span>{" "}
-                <span className={`font-medium ${viewCar.inspectionExpiry && new Date(viewCar.inspectionExpiry) < new Date(Date.now() + 15 * 86400000) ? "text-danger" : ""}`}>
+                <span className={`font-medium ${viewCar.inspectionExpiry && now15 && new Date(viewCar.inspectionExpiry) < now15 ? "text-danger" : ""}`}>
                   {viewCar.inspectionExpiry ?? "غير محدد"}
                 </span>
               </div>

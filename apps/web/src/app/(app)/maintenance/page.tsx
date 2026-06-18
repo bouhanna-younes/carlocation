@@ -217,7 +217,7 @@ export default function MaintenancePage() {
         .from("maintenance")
         .select("*, car:cars(*)")
         .order("created_at", { ascending: false })
-        .returns<any[]>();
+        .returns<Parameters<typeof mapMaintenance>[0][]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map(mapMaintenance);
     },
@@ -230,7 +230,7 @@ export default function MaintenancePage() {
         .from("cars")
         .select("*")
         .order("created_at", { ascending: false })
-        .returns<any[]>();
+        .returns<Parameters<typeof mapCar>[0][]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map(mapCar);
     },
@@ -297,12 +297,11 @@ export default function MaintenancePage() {
         priority: data.priority,
         vendor_name: data.vendorName || null,
         vendor_phone: data.vendorPhone || null,
-      } as any);
+      } as never);
       if (error) throw new Error(error.message);
 
       // Update car status to maintenance
-      await (supabase
-        .from("cars") as any)
+      await supabase.from("cars")
         .update({ status: "maintenance" })
         .eq("id", data.carId);
     },
@@ -319,8 +318,7 @@ export default function MaintenancePage() {
   const completeMutation = useMutation({
     mutationFn: async (id: string) => {
       const record = records?.find((r) => r.id === id);
-      const { error } = await (supabase
-        .from("maintenance") as any)
+      const { error } = await supabase.from("maintenance")
         .update({ status: "completed", completed_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw new Error(error.message);
@@ -335,8 +333,7 @@ export default function MaintenancePage() {
           .neq("id", id);
 
         if ((otherActive ?? 0) === 0) {
-          await (supabase
-            .from("cars") as any)
+          await supabase.from("cars")
             .update({ status: "available" })
             .eq("id", record.carId);
         }
@@ -355,16 +352,14 @@ export default function MaintenancePage() {
   const startMutation = useMutation({
     mutationFn: async (id: string) => {
       const record = records?.find((r) => r.id === id);
-      const { error } = await (supabase
-        .from("maintenance") as any)
+      const { error } = await supabase.from("maintenance")
         .update({ status: "in_progress" })
         .eq("id", id);
       if (error) throw new Error(error.message);
 
       // Update car status to maintenance
       if (record?.carId) {
-        await (supabase
-          .from("cars") as any)
+        await supabase.from("cars")
           .update({ status: "maintenance" })
           .eq("id", record.carId);
       }
@@ -380,8 +375,7 @@ export default function MaintenancePage() {
   const cancelMutation = useMutation({
     mutationFn: async (id: string) => {
       const record = records?.find((r) => r.id === id);
-      const { error } = await (supabase
-        .from("maintenance") as any)
+      const { error } = await supabase.from("maintenance")
         .update({ status: "cancelled" })
         .eq("id", id);
       if (error) throw new Error(error.message);
@@ -396,8 +390,7 @@ export default function MaintenancePage() {
           .neq("id", id);
 
         if ((otherActive ?? 0) === 0) {
-          await (supabase
-            .from("cars") as any)
+          await supabase.from("cars")
             .update({ status: "available" })
             .eq("id", record.carId);
         }

@@ -1,96 +1,89 @@
 import { supabase } from "./client";
+import type {
+  CarRow,
+  CustomerRow,
+  RentalRow,
+  MaintenanceRow,
+  NotificationRow,
+  SettingsRow,
+} from "./database.types";
 
-// =====================================================
-// GENERIC TABLE HELPERS
-// =====================================================
-export function createTableHelpers(table: string) {
+/** Tables that have a `created_at` column (used for default ordering). */
+const TABLES_WITH_CREATED_AT = new Set([
+  "profiles", "cars", "customers", "rentals", "maintenance",
+  "settings", "notifications", "invoices",
+]);
+
+/** Escape special PostgREST ilike pattern characters. */
+function escapeIlike(str: string): string {
+  return str.replace(/[%_\\]/g, (ch) => `\\${ch}`);
+}
+
+export interface QueryOptions {
+  page?: number;
+  limit?: number;
+  orderBy?: string;
+  ascending?: boolean;
+}
+
+export interface TableHelpers<Row, Insert, Update> {
+  getAll(options?: QueryOptions): Promise<{ data: Row[]; count: number }>;
+  getById(id: string): Promise<Row | null>;
+  create(item: Insert): Promise<Row>;
+  update(id: string, updates: Update): Promise<Row>;
+  remove(id: string): Promise<void>;
+  search(query: string, columns: string[]): Promise<Row[]>;
+}
+
+function buildHelpers<Row, Insert, Update>(table: string): TableHelpers<Row, Insert, Update> {
   return {
-    getAll: async (options?: {
-      page?: number;
-      limit?: number;
-      orderBy?: string;
-      ascending?: boolean;
-    }): Promise<{ data: unknown[]; count: number }> => {
+    async getAll(options?: QueryOptions) {
       const page = options?.page ?? 1;
       const limit = options?.limit ?? 100;
       const from = (page - 1) * limit;
       const to = from + limit - 1;
-
-      let query = supabase
-        .from(table)
-        .select("*", { count: "exact" })
-        .range(from, to);
-
+      let query = supabase.from(table).select("*", { count: "exact" }).range(from, to);
       if (options?.orderBy) {
-        query = query.order(options.orderBy, {
-          ascending: options.ascending ?? false,
-        });
-      } else {
+        query = query.order(options.orderBy, { ascending: options?.ascending ?? false });
+      } else if (TABLES_WITH_CREATED_AT.has(table)) {
         query = query.order("created_at", { ascending: false });
       }
-
       const { data, error, count } = await query;
       if (error) throw new Error(error.message);
-      return { data: data ?? [], count: count ?? 0 };
+      return { data: (data ?? []) as unknown as Row[], count: count ?? 0 };
     },
-
-    getById: async (id: string): Promise<unknown> => {
-      const { data, error } = await supabase
-        .from(table)
-        .select("*")
-        .eq("id", id)
-        .single();
+    async getById(id: string) {
+      const { data, error } = await supabase.from(table).select("*").eq("id", id).single();
       if (error) throw new Error(error.message);
-      return data;
+      return data as unknown as Row;
     },
-
-    create: async (item: Record<string, unknown>): Promise<unknown> => {
-      const { data, error } = await supabase
-        .from(table)
-        .insert(item as any)
-        .select()
-        .single();
+    async create(item: Insert) {
+      const { data, error } = await supabase.from(table).insert(item as never).select().single();
       if (error) throw new Error(error.message);
-      return data;
+      return data as unknown as Row;
     },
-
-    update: async (
-      id: string,
-      updates: Record<string, unknown>,
-    ): Promise<unknown> => {
-      const { data, error } = await (supabase
-        .from(table) as any)
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
+    async update(id: string, updates: Update) {
+      const { data, error } = await supabase.from(table).update(updates as never).eq("id", id).select().single();
       if (error) throw new Error(error.message);
-      return data;
+      return data as unknown as Row;
     },
-
-    remove: async (id: string): Promise<void> => {
+    async remove(id: string) {
       const { error } = await supabase.from(table).delete().eq("id", id);
       if (error) throw new Error(error.message);
     },
-
-    search: async (query: string, columns: string[]): Promise<unknown[]> => {
-      let q = supabase.from(table).select("*");
-      const orParts = columns.map((col) => `${col}.ilike.%${query}%`);
-      q = q.or(orParts.join(","));
-      const { data, error } = await q;
+    async search(query: string, columns: string[]) {
+      const escaped = escapeIlike(query);
+      const orParts = columns.map((col) => `${col}.ilike.%${escaped}%`);
+      const { data, error } = await supabase.from(table).select("*").or(orParts.join(","));
       if (error) throw new Error(error.message);
-      return data ?? [];
+      return (data ?? []) as unknown as Row[];
     },
   };
 }
 
-// =====================================================
-// PRE-BUILT TABLE HELPERS
-// =====================================================
-export const carsApi = createTableHelpers("cars");
-export const customersApi = createTableHelpers("customers");
-export const rentalsApi = createTableHelpers("rentals");
-export const maintenanceApi = createTableHelpers("maintenance");
-export const notificationsApi = createTableHelpers("notifications");
-export const settingsApi = createTableHelpers("settings");
-export const trackingApi = createTableHelpers("tracking");
+export const carsApi = buildHelpers<CarRow, never, never>("cars");
+export const customersApi = buildHelpers<CustomerRow, never, never>("customers");
+export const rentalsApi = buildHelpers<RentalRow, never, never>("rentals");
+export const maintenanceApi = buildHelpers<MaintenanceRow, never, never>("maintenance");
+export const notificationsApi = buildHelpers<NotificationRow, never, never>("notifications");
+export const settingsApi = buildHelpers<SettingsRow, never, never>("settings");

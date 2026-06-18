@@ -21,7 +21,7 @@ import {
   Download,
   X,
 } from "lucide-react";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -51,6 +51,15 @@ export default function RentalsPage() {
   useRealtime("cars");
   useRealtime("notifications");
 
+  // Mark overdue rentals via server-side RPC (runs once on mount, not inside queryFn)
+  useEffect(() => {
+    supabase.rpc("mark_overdue_rentals").then(({ error }) => {
+      if (error) console.error("mark_overdue_rentals failed:", error.message);
+      else queryClient.invalidateQueries({ queryKey: ["rentals"] });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const {
     data: rentals,
     isLoading,
@@ -58,19 +67,11 @@ export default function RentalsPage() {
   } = useQuery({
     queryKey: ["rentals"],
     queryFn: async () => {
-      // Auto-detect overdue rentals
-      const now = new Date().toISOString();
-      await (supabase
-        .from("rentals") as any)
-        .update({ status: "overdue" })
-        .eq("status", "active")
-        .lt("end_date", now);
-
       const { data, error } = await supabase
         .from("rentals")
         .select("*, customer:customers(*), car:cars(*)")
         .order("created_at", { ascending: false })
-        .returns<any[]>();
+        .returns<Parameters<typeof mapRental>[0][]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map(mapRental);
     },
@@ -83,7 +84,7 @@ export default function RentalsPage() {
         .from("customers")
         .select("*")
         .order("created_at", { ascending: false })
-        .returns<any[]>();
+        .returns<Parameters<typeof mapCustomer>[0][]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map(mapCustomer);
     },
@@ -97,7 +98,7 @@ export default function RentalsPage() {
         .select("*")
         .eq("status", "available")
         .order("created_at", { ascending: false })
-        .returns<any[]>();
+        .returns<Parameters<typeof mapAvailableCar>[0][]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map(mapAvailableCar);
     },
@@ -210,11 +211,11 @@ export default function RentalsPage() {
         notes: data.notes || null,
         discount_percent: discount || null,
         discount_reason: data.discountReason || null,
-      } as any);
+      } as never);
       if (error) throw new Error(error.message);
-      await (supabase
-        .from("cars") as any)
-        .update({ status: "rented" })
+      await supabase
+        .from("cars")
+        .update({ status: "rented" } as never)
         .eq("id", data.carId);
 
       // Fetch car and customer names for notification
@@ -269,8 +270,7 @@ export default function RentalsPage() {
       const usedDays = Math.max(1, Math.ceil(elapsedDays));
       const finalAmount = usedDays * rental.dailyRate;
 
-      const { error } = await (supabase
-        .from("rentals") as any)
+      const { error } = await supabase.from("rentals")
         .update({
           status: "completed",
           return_date: now.toISOString(),
@@ -280,9 +280,8 @@ export default function RentalsPage() {
         .eq("id", id);
       if (error) throw new Error(error.message);
       if (rental?.carId) {
-        await (supabase
-          .from("cars") as any)
-          .update({ status: "available" })
+        await supabase.from("cars")
+          .update({ status: "available" } as never)
           .eq("id", rental.carId);
       }
     },
@@ -338,8 +337,7 @@ export default function RentalsPage() {
         ? `ملغى: ${reason} | استُخدم ${usedDays} يوم | غرامة 35%: ${penalty} DZD`
         : `استُخدم ${usedDays} يوم | غرامة 35%: ${penalty} DZD`;
 
-      const { error } = await (supabase
-        .from("rentals") as any)
+      const { error } = await supabase.from("rentals")
         .update({
           status: "cancelled",
           total_amount: totalAmount,
@@ -348,9 +346,8 @@ export default function RentalsPage() {
         .eq("id", id);
       if (error) throw new Error(error.message);
       if (rental?.carId) {
-        await (supabase
-          .from("cars") as any)
-          .update({ status: "available" })
+        await supabase.from("cars")
+          .update({ status: "available" } as never)
           .eq("id", rental.carId);
       }
     },
@@ -395,8 +392,7 @@ export default function RentalsPage() {
       if (data.startDate) update.start_date = data.startDate;
       if (data.endDate) update.end_date = data.endDate;
       if (data.notes !== undefined) update.notes = data.notes;
-      const { error } = await (supabase
-        .from("rentals") as any)
+      const { error } = await supabase.from("rentals")
         .update(update)
         .eq("id", data.id);
       if (error) throw new Error(error.message);

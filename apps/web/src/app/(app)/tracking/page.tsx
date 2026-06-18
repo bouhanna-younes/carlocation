@@ -37,13 +37,13 @@ export default function TrackingPage() {
         .select("id, brand, model, plate_number, status")
         .neq("status", "out_of_service")
         .order("brand")
-        .returns<any[]>();
+        .returns<{ id: string; brand: string; model: string; plate_number: string; status: string }[]>();
       if (carsError) throw new Error(carsError.message);
 
       const { data: trackingData } = await supabase
         .from("latest_tracking")
         .select("car_id, latitude, longitude, timestamp")
-        .returns<any[]>();
+        .returns<{ car_id: string; latitude: number; longitude: number; timestamp: string }[]>();
 
       const latestByCar = new Map<string, { latitude: number; longitude: number; timestamp: string }>();
       for (const t of trackingData ?? []) {
@@ -284,9 +284,9 @@ export default function TrackingPage() {
                         </td>
                         <td className="p-4">
                           <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border ${carStatusMap[car.status]?.colorClass ?? "bg-muted/15 text-muted border-muted/30"}`}
+                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium border ${(carStatusMap as Record<string, { label: string; colorClass: string }>)[car.status]?.colorClass ?? "bg-muted/15 text-muted border-muted/30"}`}
                           >
-                            {carStatusMap[car.status]?.label ?? car.status}
+                            {(carStatusMap as Record<string, { label: string; colorClass: string }>)[car.status]?.label ?? car.status}
                           </span>
                         </td>
                       </tr>
@@ -320,9 +320,9 @@ export default function TrackingPage() {
                         </div>
                       </div>
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${carStatusMap[car.status]?.colorClass ?? ""}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${(carStatusMap as Record<string, { label: string; colorClass: string }>)[car.status]?.colorClass ?? ""}`}
                       >
-                        {carStatusMap[car.status]?.label ?? car.status}
+                        {(carStatusMap as Record<string, { label: string; colorClass: string }>)[car.status]?.label ?? car.status}
                       </span>
                     </div>
                     <div className="space-y-1 text-xs text-muted">

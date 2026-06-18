@@ -1,11 +1,134 @@
-import type { Database } from "@/lib/supabase/types";
+import type {
+  CarStatus,
+  Transmission,
+  RentalStatus,
+  MaintenanceStatus,
+  Priority,
+  NotificationType,
+  InvoiceStatus,
+  Json,
+  CarRow,
+  CustomerRow,
+  RentalRow,
+  MaintenanceRow,
+  NotificationRow,
+  InvoiceRow,
+} from "@/lib/supabase/database.types";
 
-type Tables = Database["public"]["Tables"];
+type CarInsert = {
+  brand: string;
+  model: string;
+  year: number;
+  plate_number: string;
+  color: string;
+  daily_rate: number;
+  status?: CarStatus;
+  fuel_type: string;
+  seats: number;
+  transmission?: Transmission;
+  insurance_expiry?: string;
+  oil_change_expiry?: string;
+  vignette_expiry?: string;
+  inspection_expiry?: string;
+};
+type CarUpdate = Partial<CarInsert>;
+
+type CustomerInsert = {
+  first_name: string;
+  last_name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  id_number?: string;
+  driver_license_number?: string;
+  driver_license_expiry?: string;
+  date_of_birth?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  notes?: string;
+  blacklisted?: boolean;
+  blacklist_reason?: string;
+};
+type CustomerUpdate = Partial<CustomerInsert>;
+
+type RentalInsert = {
+  customer_id: string;
+  car_id: string;
+  renter_id: string;
+  start_date: string;
+  end_date: string;
+  daily_rate: number;
+  total_amount?: number;
+  deposit_amount?: number;
+  deposit_paid?: boolean;
+  start_mileage?: number;
+  status?: RentalStatus;
+  notes?: string;
+  discount_percent?: number;
+  discount_reason?: string;
+};
+type RentalUpdate = Partial<{
+  return_date: string;
+  total_amount: number;
+  deposit_refunded: boolean;
+  end_mileage: number;
+  status: RentalStatus;
+  notes: string;
+  start_mileage: number;
+  deposit_amount: number;
+  deposit_paid: boolean;
+  discount_percent: number;
+  discount_reason: string;
+  end_date: string;
+}>;
+
+type MaintenanceInsert = {
+  car_id: string;
+  type: string;
+  description: string;
+  cost: number;
+  status?: MaintenanceStatus;
+  priority?: Priority;
+  vendor_name?: string;
+  vendor_phone?: string;
+  mileage_at_start?: number;
+  scheduled_at?: string;
+};
+type MaintenanceUpdate = Partial<MaintenanceInsert> & {
+  mileage_at_completion?: number;
+  completed_at?: string;
+};
+
+type NotificationInsert = {
+  title: string;
+  message: string;
+  type?: NotificationType;
+  category?: string;
+  metadata?: Json;
+  recipient_id?: string;
+  is_read?: boolean;
+};
+
+type InvoiceUpdate = Partial<{
+  return_date: string;
+  paid_amount: number;
+  payment_method: string;
+  status: InvoiceStatus;
+  is_cancelled: boolean;
+  cancelled_at: string;
+  cancellation_reason: string;
+  penalty_percent: number;
+  penalty_amount: number;
+  refund_amount: number;
+  total_days: number;
+  total_amount: number;
+  notes: string;
+}>;
 
 // =====================================================
-// CAR MAPPING
+// CAR
 // =====================================================
-type SupabaseCar = Tables["cars"]["Row"];
+type SupabaseCar = CarRow;
 
 export interface Car {
   id: string;
@@ -15,10 +138,10 @@ export interface Car {
   plateNumber: string;
   color: string;
   dailyRate: number;
-  status: "available" | "rented" | "maintenance" | "out_of_service";
+  status: CarStatus;
   fuelType: string;
   seats: number;
-  transmission?: "manual" | "automatic";
+  transmission: Transmission;
   insuranceExpiry?: string;
   oilChangeExpiry?: string;
   vignetteExpiry?: string;
@@ -49,7 +172,7 @@ export function mapCar(row: SupabaseCar): Car {
   };
 }
 
-export function toCarInsert(data: Partial<Car>): Tables["cars"]["Insert"] {
+export function toCarInsert(data: Partial<Car>): CarInsert {
   return {
     brand: data.brand!,
     model: data.model!,
@@ -57,10 +180,10 @@ export function toCarInsert(data: Partial<Car>): Tables["cars"]["Insert"] {
     plate_number: data.plateNumber!,
     color: data.color!,
     daily_rate: data.dailyRate!,
-    status: data.status as Tables["cars"]["Insert"]["status"],
+    status: data.status,
     fuel_type: data.fuelType!,
     seats: data.seats!,
-    transmission: data.transmission as Tables["cars"]["Insert"]["transmission"],
+    transmission: data.transmission,
     insurance_expiry: data.insuranceExpiry,
     oil_change_expiry: data.oilChangeExpiry,
     vignette_expiry: data.vignetteExpiry,
@@ -68,20 +191,18 @@ export function toCarInsert(data: Partial<Car>): Tables["cars"]["Insert"] {
   };
 }
 
-export function toCarUpdate(data: Partial<Car>): Tables["cars"]["Update"] {
-  const update: Tables["cars"]["Update"] = {};
+export function toCarUpdate(data: Partial<Car>): CarUpdate {
+  const update: CarUpdate = {};
   if (data.brand !== undefined) update.brand = data.brand;
   if (data.model !== undefined) update.model = data.model;
   if (data.year !== undefined) update.year = data.year;
   if (data.plateNumber !== undefined) update.plate_number = data.plateNumber;
   if (data.color !== undefined) update.color = data.color;
   if (data.dailyRate !== undefined) update.daily_rate = data.dailyRate;
-  if (data.status !== undefined)
-    update.status = data.status as Tables["cars"]["Update"]["status"];
+  if (data.status !== undefined) update.status = data.status;
   if (data.fuelType !== undefined) update.fuel_type = data.fuelType;
   if (data.seats !== undefined) update.seats = data.seats;
-  if (data.transmission !== undefined)
-    update.transmission = data.transmission as Tables["cars"]["Update"]["transmission"];
+  if (data.transmission !== undefined) update.transmission = data.transmission;
   if (data.insuranceExpiry !== undefined) update.insurance_expiry = data.insuranceExpiry;
   if (data.oilChangeExpiry !== undefined) update.oil_change_expiry = data.oilChangeExpiry;
   if (data.vignetteExpiry !== undefined) update.vignette_expiry = data.vignetteExpiry;
@@ -90,9 +211,9 @@ export function toCarUpdate(data: Partial<Car>): Tables["cars"]["Update"] {
 }
 
 // =====================================================
-// CUSTOMER MAPPING
+// CUSTOMER
 // =====================================================
-type SupabaseCustomer = Tables["customers"]["Row"];
+type SupabaseCustomer = CustomerRow;
 
 export interface Customer {
   id: string;
@@ -136,9 +257,7 @@ export function mapCustomer(row: SupabaseCustomer): Customer {
   };
 }
 
-export function toCustomerInsert(
-  data: Partial<Customer>,
-): Tables["customers"]["Insert"] {
+export function toCustomerInsert(data: Partial<Customer>): CustomerInsert {
   return {
     first_name: data.firstName!,
     last_name: data.lastName!,
@@ -157,36 +276,29 @@ export function toCustomerInsert(
   };
 }
 
-export function toCustomerUpdate(
-  data: Partial<Customer>,
-): Tables["customers"]["Update"] {
-  const update: Tables["customers"]["Update"] = {};
+export function toCustomerUpdate(data: Partial<Customer>): CustomerUpdate {
+  const update: CustomerUpdate = {};
   if (data.firstName !== undefined) update.first_name = data.firstName;
   if (data.lastName !== undefined) update.last_name = data.lastName;
   if (data.phone !== undefined) update.phone = data.phone;
   if (data.email !== undefined) update.email = data.email;
   if (data.address !== undefined) update.address = data.address;
   if (data.idNumber !== undefined) update.id_number = data.idNumber;
-  if (data.driverLicenseNumber !== undefined)
-    update.driver_license_number = data.driverLicenseNumber;
-  if (data.driverLicenseExpiry !== undefined)
-    update.driver_license_expiry = data.driverLicenseExpiry;
+  if (data.driverLicenseNumber !== undefined) update.driver_license_number = data.driverLicenseNumber;
+  if (data.driverLicenseExpiry !== undefined) update.driver_license_expiry = data.driverLicenseExpiry;
   if (data.dateOfBirth !== undefined) update.date_of_birth = data.dateOfBirth;
-  if (data.emergencyContactName !== undefined)
-    update.emergency_contact_name = data.emergencyContactName;
-  if (data.emergencyContactPhone !== undefined)
-    update.emergency_contact_phone = data.emergencyContactPhone;
+  if (data.emergencyContactName !== undefined) update.emergency_contact_name = data.emergencyContactName;
+  if (data.emergencyContactPhone !== undefined) update.emergency_contact_phone = data.emergencyContactPhone;
   if (data.notes !== undefined) update.notes = data.notes;
   if (data.blacklisted !== undefined) update.blacklisted = data.blacklisted;
-  if (data.blacklistReason !== undefined)
-    update.blacklist_reason = data.blacklistReason;
+  if (data.blacklistReason !== undefined) update.blacklist_reason = data.blacklistReason;
   return update;
 }
 
 // =====================================================
-// RENTAL MAPPING
+// RENTAL
 // =====================================================
-type SupabaseRental = Tables["rentals"]["Row"];
+type SupabaseRental = RentalRow;
 
 export interface Rental {
   id: string;
@@ -203,7 +315,7 @@ export interface Rental {
   depositRefunded?: boolean;
   startMileage?: number;
   endMileage?: number;
-  status: "active" | "completed" | "overdue" | "cancelled" | "reserved";
+  status: RentalStatus;
   notes?: string;
   discountPercent?: number;
   discountReason?: string;
@@ -216,9 +328,9 @@ export interface Rental {
   carModel?: string;
 }
 
-export function mapRental(
-  row: SupabaseRental & { customer?: SupabaseCustomer; car?: SupabaseCar },
-): Rental {
+type RentalRowWithJoins = SupabaseRental & { customer?: SupabaseCustomer; car?: SupabaseCar };
+
+export function mapRental(row: RentalRowWithJoins): Rental {
   return {
     id: row.id,
     customerId: row.customer_id,
@@ -242,18 +354,52 @@ export function mapRental(
     updatedAt: row.updated_at,
     customer: row.customer ? mapCustomer(row.customer) : undefined,
     car: row.car ? mapCar(row.car) : undefined,
-    customerName: row.customer
-      ? `${row.customer.first_name} ${row.customer.last_name}`
-      : undefined,
+    customerName: row.customer ? `${row.customer.first_name} ${row.customer.last_name}` : undefined,
     carBrand: row.car?.brand,
     carModel: row.car?.model,
   };
 }
 
+export function toRentalInsert(data: Partial<Rental>): RentalInsert {
+  return {
+    customer_id: data.customerId!,
+    car_id: data.carId!,
+    renter_id: data.renterId!,
+    start_date: data.startDate!,
+    end_date: data.endDate!,
+    daily_rate: data.dailyRate!,
+    total_amount: data.totalAmount,
+    deposit_amount: data.depositAmount,
+    deposit_paid: data.depositPaid,
+    start_mileage: data.startMileage,
+    status: data.status,
+    notes: data.notes,
+    discount_percent: data.discountPercent,
+    discount_reason: data.discountReason,
+  };
+}
+
+export function toRentalUpdate(data: Partial<Rental>): RentalUpdate {
+  const update: RentalUpdate = {};
+  if (data.returnDate !== undefined) update.return_date = data.returnDate;
+  if (data.totalAmount !== undefined) update.total_amount = data.totalAmount;
+  if (data.depositRefunded !== undefined) update.deposit_refunded = data.depositRefunded;
+  if (data.endMileage !== undefined) update.end_mileage = data.endMileage;
+  if (data.status !== undefined) update.status = data.status;
+  if (data.notes !== undefined) update.notes = data.notes;
+  if (data.startMileage !== undefined) update.start_mileage = data.startMileage;
+  if (data.depositAmount !== undefined) update.deposit_amount = data.depositAmount;
+  if (data.depositPaid !== undefined) update.deposit_paid = data.depositPaid;
+  if (data.discountPercent !== undefined) update.discount_percent = data.discountPercent;
+  if (data.discountReason !== undefined) update.discount_reason = data.discountReason;
+  if (data.endDate !== undefined) update.end_date = data.endDate;
+  return update;
+}
+
 // =====================================================
-// MAINTENANCE MAPPING
+// MAINTENANCE
 // =====================================================
-type SupabaseMaintenance = Tables["maintenance"]["Row"];
+type SupabaseMaintenance = MaintenanceRow;
 
 export interface MaintenanceRecord {
   id: string;
@@ -261,8 +407,8 @@ export interface MaintenanceRecord {
   type: string;
   description: string;
   cost: number;
-  status: "pending" | "in_progress" | "completed" | "cancelled";
-  priority?: "low" | "medium" | "high" | "critical";
+  status: MaintenanceStatus;
+  priority: Priority;
   vendorName?: string;
   vendorPhone?: string;
   mileageAtStart?: number;
@@ -301,19 +447,51 @@ export function mapMaintenance(
   };
 }
 
+export function toMaintenanceInsert(data: Partial<MaintenanceRecord>): MaintenanceInsert {
+  return {
+    car_id: data.carId!,
+    type: data.type!,
+    description: data.description!,
+    cost: data.cost!,
+    status: data.status,
+    priority: data.priority,
+    vendor_name: data.vendorName,
+    vendor_phone: data.vendorPhone,
+    mileage_at_start: data.mileageAtStart,
+    scheduled_at: data.scheduledAt,
+  };
+}
+
+export function toMaintenanceUpdate(data: Partial<MaintenanceRecord>): MaintenanceUpdate {
+  const update: MaintenanceUpdate = {};
+  if (data.type !== undefined) update.type = data.type;
+  if (data.description !== undefined) update.description = data.description;
+  if (data.cost !== undefined) update.cost = data.cost;
+  if (data.status !== undefined) update.status = data.status;
+  if (data.priority !== undefined) update.priority = data.priority;
+  if (data.vendorName !== undefined) update.vendor_name = data.vendorName;
+  if (data.vendorPhone !== undefined) update.vendor_phone = data.vendorPhone;
+  if (data.mileageAtStart !== undefined) update.mileage_at_start = data.mileageAtStart;
+  if (data.mileageAtCompletion !== undefined) update.mileage_at_completion = data.mileageAtCompletion;
+  if (data.scheduledAt !== undefined) update.scheduled_at = data.scheduledAt;
+  if (data.completedAt !== undefined) update.completed_at = data.completedAt;
+  return update;
+}
+
 // =====================================================
-// NOTIFICATION MAPPING
+// NOTIFICATION
 // =====================================================
-type SupabaseNotification = Tables["notifications"]["Row"];
+type SupabaseNotification = NotificationRow;
 
 export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: string;
+  type: NotificationType;
   isRead: boolean;
   category: string;
-  metadata?: string;
+  metadata?: Json;
+  recipientId?: string | null;
   createdAt: string;
 }
 
@@ -324,9 +502,22 @@ export function mapNotification(row: SupabaseNotification): Notification {
     message: row.message,
     type: row.type,
     isRead: row.is_read,
-    category: (row as any).category ?? "general",
-    metadata: (row as any).metadata ?? undefined,
+    category: row.category ?? "general",
+    metadata: row.metadata ?? undefined,
+    recipientId: row.recipient_id,
     createdAt: row.created_at,
+  };
+}
+
+export function toNotificationInsert(data: Partial<Notification>): NotificationInsert {
+  return {
+    title: data.title!,
+    message: data.message!,
+    type: data.type,
+    category: data.category,
+    metadata: data.metadata,
+    recipient_id: data.recipientId ?? undefined,
+    is_read: data.isRead,
   };
 }
 
@@ -352,9 +543,9 @@ export function mapAvailableCar(row: SupabaseCar): AvailableCar {
 }
 
 // =====================================================
-// INVOICE MAPPING
+// INVOICE
 // =====================================================
-type SupabaseInvoice = Tables["invoices"]["Row"];
+type SupabaseInvoice = InvoiceRow;
 
 export interface Invoice {
   id: string;
@@ -378,16 +569,17 @@ export interface Invoice {
   refundAmount: number;
   paidAmount: number;
   paymentMethod?: string;
-  status: "pending" | "paid" | "refunded" | "cancelled";
+  status: InvoiceStatus;
   notes?: string;
   createdAt: string;
   updatedAt: string;
-  // Joined data
   customer?: Customer;
   car?: Car;
 }
 
-export function mapInvoice(row: SupabaseInvoice & { customer?: SupabaseCustomer; car?: SupabaseCar }): Invoice {
+export function mapInvoice(
+  row: SupabaseInvoice & { customer?: SupabaseCustomer; car?: SupabaseCar },
+): Invoice {
   return {
     id: row.id,
     rentalId: row.rental_id,
@@ -417,4 +609,22 @@ export function mapInvoice(row: SupabaseInvoice & { customer?: SupabaseCustomer;
     customer: row.customer ? mapCustomer(row.customer) : undefined,
     car: row.car ? mapCar(row.car) : undefined,
   };
+}
+
+export function toInvoiceUpdate(data: Partial<Invoice>): InvoiceUpdate {
+  const update: InvoiceUpdate = {};
+  if (data.returnDate !== undefined) update.return_date = data.returnDate;
+  if (data.paidAmount !== undefined) update.paid_amount = data.paidAmount;
+  if (data.paymentMethod !== undefined) update.payment_method = data.paymentMethod;
+  if (data.status !== undefined) update.status = data.status;
+  if (data.isCancelled !== undefined) update.is_cancelled = data.isCancelled;
+  if (data.cancelledAt !== undefined) update.cancelled_at = data.cancelledAt;
+  if (data.cancellationReason !== undefined) update.cancellation_reason = data.cancellationReason;
+  if (data.penaltyPercent !== undefined) update.penalty_percent = data.penaltyPercent;
+  if (data.penaltyAmount !== undefined) update.penalty_amount = data.penaltyAmount;
+  if (data.refundAmount !== undefined) update.refund_amount = data.refundAmount;
+  if (data.totalDays !== undefined) update.total_days = data.totalDays;
+  if (data.totalAmount !== undefined) update.total_amount = data.totalAmount;
+  if (data.notes !== undefined) update.notes = data.notes;
+  return update;
 }

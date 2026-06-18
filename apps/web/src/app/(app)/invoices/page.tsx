@@ -192,7 +192,7 @@ export default function InvoicesPage() {
         .from("invoices")
         .select("*, customer:customers(*), car:cars(*)")
         .order("created_at", { ascending: false })
-        .returns<any[]>();
+        .returns<Parameters<typeof mapInvoice>[0][]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map(mapInvoice);
     },

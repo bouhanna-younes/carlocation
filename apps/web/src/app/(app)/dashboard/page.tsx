@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import { checkExpiryDates } from "@/lib/notifications";
+import { mapNotification, mapMaintenance } from "@/lib/mappers";
 import {
   Car,
   KeyRound,
@@ -39,13 +40,21 @@ import { useRealtime } from "@/hooks/use-realtime";
 
 interface DashboardKPIs {
   totalCars: number;
-  activeRentals: number;
-  totalCustomers: number;
-  monthlyRevenue: number;
   availableCars: number;
   rentedCars: number;
   maintenanceCars: number;
+  totalCustomers: number;
+  blacklistedCustomers: number;
+  activeRentals: number;
   overdueRentals: number;
+  revenueThisMonth: number;
+  revenueLastMonth: number;
+  revenueYtd: number;
+  openInvoicesCount: number;
+  openInvoicesAmount: number;
+  pendingMaintenance: number;
+  // Derived (computed client-side from the RPC payload)
+  monthlyRevenue: number;
   monthlyRevenueChange: number;
   activeMaintenance: number;
   occupancyRate: number;
@@ -205,59 +214,37 @@ export default function DashboardPage() {
   } = useQuery<DashboardKPIs>({
     queryKey: ["dashboard-kpis"],
     queryFn: async () => {
-      const [carsRes, rentalsRes, customersRes, maintenanceRes] = await Promise.all([
-        supabase.from("cars").select("status").returns<{ status: string }[]>(),
-        supabase.from("rentals").select("status, total_amount, start_date, end_date, return_date").returns<{ status: string; total_amount: number | null; start_date: string; end_date: string; return_date: string | null }[]>(),
-        supabase.from("customers").select("id", { count: "exact", head: true }),
-        supabase.from("maintenance").select("status").in("status", ["pending", "in_progress"]).returns<{ status: string }[]>(),
-      ]);
-      if (carsRes.error) throw new Error(carsRes.error.message);
-      if (rentalsRes.error) throw new Error(rentalsRes.error.message);
-      if (customersRes.error) throw new Error(customersRes.error.message);
-      if (maintenanceRes.error) throw new Error(maintenanceRes.error.message);
-
-      const cars = carsRes.data ?? [];
-      const rentals = rentalsRes.data ?? [];
-      const totalCars = cars.length;
-      const availableCars = cars.filter((c) => c.status === "available").length;
-      const rentedCars = cars.filter((c) => c.status === "rented").length;
-      const maintenanceCars = cars.filter((c) => c.status === "maintenance").length;
-      const activeRentals = rentals.filter((r) => r.status === "active").length;
-      const overdueRentals = rentals.filter((r) => r.status === "overdue").length;
-
-      const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString();
-
-      const thisMonthRevenue = rentals
-        .filter((r) => r.status === "completed" && r.return_date && r.return_date >= monthStart)
-        .reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
-      const lastMonthRevenue = rentals
-        .filter((r) => r.status === "completed" && r.return_date && r.return_date >= lastMonthStart && r.return_date <= lastMonthEnd)
-        .reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
-      const monthlyRevenueChange = lastMonthRevenue > 0
-        ? Math.round(((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)
-        : 0;
-
-      const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
-      const totalRevenueYTD = rentals
-        .filter((r) => r.status === "completed" && r.return_date && r.return_date >= yearStart)
-        .reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
-
+      const { data, error } = await supabase.rpc("dashboard_kpis");
+      if (error) throw new Error(error.message);
+      const k = (data ?? {}) as unknown as Record<string, number>;
+      const totalCars = k.totalCars ?? 0;
+      const rentedCars = k.rentedCars ?? 0;
+      const revenueThisMonth = k.revenueThisMonth ?? 0;
+      const revenueLastMonth = k.revenueLastMonth ?? 0;
+      const monthlyRevenueChange =
+        revenueLastMonth > 0
+          ? Math.round(((revenueThisMonth - revenueLastMonth) / revenueLastMonth) * 100)
+          : 0;
       return {
         totalCars,
-        activeRentals,
-        totalCustomers: customersRes.count ?? 0,
-        monthlyRevenue: thisMonthRevenue,
-        availableCars,
+        availableCars: k.availableCars ?? 0,
         rentedCars,
-        maintenanceCars,
-        overdueRentals,
+        maintenanceCars: k.maintenanceCars ?? 0,
+        totalCustomers: k.totalCustomers ?? 0,
+        blacklistedCustomers: k.blacklistedCustomers ?? 0,
+        activeRentals: k.activeRentals ?? 0,
+        overdueRentals: k.overdueRentals ?? 0,
+        revenueThisMonth,
+        revenueLastMonth,
+        revenueYtd: k.revenueYtd ?? 0,
+        openInvoicesCount: k.openInvoicesCount ?? 0,
+        openInvoicesAmount: k.openInvoicesAmount ?? 0,
+        pendingMaintenance: k.pendingMaintenance ?? 0,
+        monthlyRevenue: revenueThisMonth,
         monthlyRevenueChange,
-        activeMaintenance: (maintenanceRes.data ?? []).length,
+        activeMaintenance: k.pendingMaintenance ?? 0,
         occupancyRate: totalCars > 0 ? Math.round((rentedCars / totalCars) * 100) : 0,
-        totalRevenueYTD,
+        totalRevenueYTD: k.revenueYtd ?? 0,
       };
     },
   });
@@ -300,7 +287,7 @@ export default function DashboardPage() {
         .select("*, customer:customers(first_name, last_name, phone), car:cars(brand, model)")
         .order("created_at", { ascending: false })
         .limit(5)
-        .returns<any[]>();
+        .returns<{ id: string; start_date: string; end_date: string; total_amount: number | null; status: string; customer: { first_name: string; last_name: string; phone: string | null } | null; car: { brand: string; model: string } | null }[]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map((r) => {
         const cust = Array.isArray(r.customer) ? r.customer[0] : r.customer;
@@ -330,7 +317,7 @@ export default function DashboardPage() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(6)
-        .returns<any[]>();
+        .returns<Parameters<typeof mapNotification>[0][]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map((n) => ({
         id: n.id,
@@ -353,7 +340,7 @@ export default function DashboardPage() {
         .eq("status", "active")
         .lte("end_date", weekLater)
         .gte("end_date", now)
-        .returns<any[]>();
+        .returns<{ id: string; end_date: string; customer: { first_name: string; last_name: string } | null; car: { brand: string; model: string } | null }[]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map((r) => {
         const cust = Array.isArray(r.customer) ? r.customer[0] : r.customer;
@@ -380,7 +367,7 @@ export default function DashboardPage() {
         .in("status", ["pending", "in_progress"])
         .order("created_at", { ascending: false })
         .limit(5)
-        .returns<any[]>();
+        .returns<{ id: string; type: string; scheduled_at: string | null; cost: number; car: { brand: string; model: string } | null }[]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map((m) => {
         const car = Array.isArray(m.car) ? m.car[0] : m.car;

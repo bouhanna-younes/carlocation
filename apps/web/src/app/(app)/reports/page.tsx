@@ -71,30 +71,12 @@ export default function ReportsPage() {
   } = useQuery<MonthlyRevenue[]>({
     queryKey: ["reports-monthly-revenue", selectedYear],
     queryFn: async () => {
-      const yearStart = new Date(selectedYear, 0, 1).toISOString();
-      const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59).toISOString();
-      const { data, error } = await supabase
-        .from("rentals")
-        .select("total_amount, start_date")
-        .eq("status", "completed")
-        .gte("start_date", yearStart)
-        .lte("start_date", yearEnd)
-        .returns<any[]>();
+      const { data, error } = await supabase.rpc("monthly_revenue", { p_year: selectedYear });
       if (error) throw new Error(error.message);
-      const monthNames = ["جانفي", "فيفري", "مارس", "أفريل", "ماي", "جوان", "جويلية", "أوت", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-      const months: MonthlyRevenue[] = [];
-      for (let m = 0; m < 12; m++) {
-        const mStart = new Date(selectedYear, m, 1);
-        const mEnd = new Date(selectedYear, m + 1, 0);
-        const revenue = (data ?? [])
-          .filter((r) => {
-            const d = new Date(r.start_date);
-            return d >= mStart && d <= mEnd;
-          })
-          .reduce((sum, r) => sum + (r.total_amount ?? 0), 0);
-        months.push({ month: monthNames[m], revenue });
-      }
-      return months;
+      return (((data ?? []) as unknown) as Array<{ month_label: string; revenue: number }>).map((r) => ({
+        month: r.month_label,
+        revenue: r.revenue ?? 0,
+      }));
     },
   });
 
@@ -105,33 +87,22 @@ export default function ReportsPage() {
   } = useQuery<TopCar[]>({
     queryKey: ["reports-top-cars"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("rentals")
-        .select("total_amount, car_id, car:cars(brand, model)")
-        .eq("status", "completed")
-        .returns<any[]>();
+      const { data, error } = await supabase.rpc("top_cars", { p_limit: 5 });
       if (error) throw new Error(error.message);
-      const byCar = new Map<string, { brand: string; model: string; rentalCount: number; revenue: number }>();
-      for (const r of data ?? []) {
-        const key = r.car_id;
-        const car = Array.isArray(r.car) ? r.car[0] : r.car;
-        const existing = byCar.get(key);
-        if (existing) {
-          existing.rentalCount++;
-          existing.revenue += r.total_amount ?? 0;
-        } else {
-          byCar.set(key, {
-            brand: car?.brand ?? "",
-            model: car?.model ?? "",
-            rentalCount: 1,
-            revenue: r.total_amount ?? 0,
-          });
-        }
-      }
-      return Array.from(byCar.entries())
-        .map(([id, v]) => ({ id, ...v }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5);
+      return ((data ?? []) as Array<{
+        car_id: string;
+        brand: string;
+        model: string;
+        plate_number: string;
+        total_revenue: number;
+        rentals_count: number;
+      }>).map((r) => ({
+        id: r.car_id,
+        brand: r.brand,
+        model: r.model,
+        rentalCount: r.rentals_count ?? 0,
+        revenue: r.total_revenue ?? 0,
+      }));
     },
   });
 
@@ -142,29 +113,20 @@ export default function ReportsPage() {
   } = useQuery<TopCustomer[]>({
     queryKey: ["reports-top-customers"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("rentals")
-        .select("total_amount, customer_id, customer:customers(first_name, last_name)")
-        .eq("status", "completed")
-        .returns<any[]>();
+      const { data, error } = await supabase.rpc("top_customers", { p_limit: 10 });
       if (error) throw new Error(error.message);
-      const byCustomer = new Map<string, { name: string; rentalCount: number; totalSpent: number }>();
-      for (const r of data ?? []) {
-        const key = r.customer_id;
-        const existing = byCustomer.get(key);
-        const cust = Array.isArray(r.customer) ? r.customer[0] : r.customer;
-        const name = cust ? `${cust.first_name} ${cust.last_name}` : "";
-        if (existing) {
-          existing.rentalCount++;
-          existing.totalSpent += r.total_amount ?? 0;
-        } else {
-          byCustomer.set(key, { name, rentalCount: 1, totalSpent: r.total_amount ?? 0 });
-        }
-      }
-      return Array.from(byCustomer.entries())
-        .map(([id, v]) => ({ id, ...v }))
-        .sort((a, b) => b.totalSpent - a.totalSpent)
-        .slice(0, 10);
+      return ((data ?? []) as Array<{
+        customer_id: string;
+        first_name: string;
+        last_name: string;
+        total_spent: number;
+        rentals_count: number;
+      }>).map((r) => ({
+        id: r.customer_id,
+        name: `${r.first_name} ${r.last_name}`,
+        rentalCount: r.rentals_count ?? 0,
+        totalSpent: r.total_spent ?? 0,
+      }));
     },
   });
 
@@ -181,7 +143,7 @@ export default function ReportsPage() {
         .eq("status", "completed")
         .gte("created_at", yearStart)
         .lte("created_at", yearEnd)
-        .returns<any[]>();
+        .returns<{ cost: number; completed_at: string | null; created_at: string }[]>();
       if (error) throw new Error(error.message);
       const monthNames = ["جانفي", "فيفري", "مارس", "أفريل", "ماي", "جوان", "جويلية", "أوت", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
       const months: MaintenanceCost[] = [];

@@ -80,7 +80,7 @@ export default function NotificationsPage() {
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
-        .returns<any[]>();
+        .returns<Parameters<typeof mapNotification>[0][]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map(mapNotification);
     },
@@ -88,9 +88,9 @@ export default function NotificationsPage() {
 
   const markRead = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase
-        .from("notifications") as any)
-        .update({ is_read: true })
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true } as never)
         .eq("id", id);
       if (error) throw new Error(error.message);
     },
@@ -118,9 +118,9 @@ export default function NotificationsPage() {
 
   const markAllRead = useMutation({
     mutationFn: async () => {
-      const { error } = await (supabase
-        .from("notifications") as any)
-        .update({ is_read: true })
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true } as never)
         .eq("is_read", false);
       if (error) throw new Error(error.message);
     },
@@ -273,9 +273,9 @@ export default function NotificationsPage() {
                     // Don't mark as read here — only after saving changes
                     if (carLinkedCategories.includes(n.category) && n.metadata) {
                       try {
-                        const meta = JSON.parse(n.metadata);
+                        const meta = n.metadata as Record<string, unknown>;
                         if (meta.carId) {
-                          router.push(`/fleet?edit=${meta.carId}&notification=${n.id}`);
+                          router.push(`/fleet?edit=${String(meta.carId)}&notification=${n.id}`);
                           return;
                         }
                       } catch {}

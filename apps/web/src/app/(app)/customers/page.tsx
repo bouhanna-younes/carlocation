@@ -288,38 +288,36 @@ export default function CustomersPage() {
       const { data, error } = await supabase
         .from("customers")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .returns<Parameters<typeof mapCustomer>[0][]>();
       if (error) throw new Error(error.message);
       return (data ?? []).map(mapCustomer);
     },
   });
 
+  // Single RPC replaces the N+1 loop (was 2 requests per customer).
   const { data: customerStats } = useQuery({
     queryKey: ["customer-stats"],
     queryFn: async () => {
-      if (!customers) return {};
-      const stats: Record<string, { rentalCount: number; totalSpent: number }> = {};
-      for (const c of customers) {
-        const { count } = await supabase
-          .from("rentals")
-          .select("*", { count: "exact", head: true })
-          .eq("customer_id", c.id)
-          .in("status", ["active", "completed", "overdue"]);
-        const { data: spent } = await supabase
-          .from("rentals")
-          .select("total_amount")
-          .eq("customer_id", c.id)
-          .eq("status", "completed")
-          .returns<{ total_amount: number | null }[]>();
-        const totalSpent = (spent ?? []).reduce(
-          (sum, r) => sum + (r.total_amount ?? 0),
-          0,
-        );
-        stats[c.id] = { rentalCount: count ?? 0, totalSpent };
+      const { data, error } = await supabase.rpc("customer_stats");
+      if (error) throw new Error(error.message);
+      const stats: Record<string, { rentalCount: number; totalSpent: number; activeRentals: number }> = {};
+      for (const row of ((data ?? []) as unknown) as Array<{
+        customer_id: string;
+        total_rentals: number;
+        active_rentals: number;
+        completed_rentals: number;
+        total_spent: number;
+        outstanding: number;
+      }>) {
+        stats[row.customer_id] = {
+          rentalCount: row.total_rentals ?? 0,
+          totalSpent: row.total_spent ?? 0,
+          activeRentals: row.active_rentals ?? 0,
+        };
       }
       return stats;
     },
-    enabled: !!customers?.length,
   });
 
   const searchFn = useCallback((c: Customer, search: string) => {

@@ -36,11 +36,12 @@ export default function SettingsPage() {
         .select("value")
         .eq("key", "platform_info")
         .single()
-        .returns<any>();
+        .returns<{ value: unknown } | null>();
       if (error && error.code !== "PGRST116") throw new Error(error.message);
-      return {
-        platformInfo: data ? JSON.parse((data as any).value) as PlatformInfo : {},
-      };
+      const raw = data?.value;
+      const parsed: PlatformInfo =
+        raw && typeof raw === "object" ? (raw as PlatformInfo) : {};
+      return { platformInfo: parsed };
     },
   });
 
@@ -69,7 +70,7 @@ export default function SettingsPage() {
     mutationFn: async (data: typeof platform) => {
       const { error } = await supabase
         .from("settings")
-        .upsert({ key: "platform_info", value: JSON.stringify(data) } as any, { onConflict: "key" });
+        .upsert({ key: "platform_info", value: data as never }, { onConflict: "key" });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
