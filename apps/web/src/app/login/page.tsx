@@ -78,7 +78,7 @@ export default function LoginPage() {
     {
       icon: Shield,
       title: "أمان متقدم",
-      desc: "تشفير عالي المستوى وحماية فورية لبيانات الأسطول.",
+      desc: "تشفير عالي المستوى وحماية فورية لبيانات السيارات.",
     },
     {
       icon: Zap,

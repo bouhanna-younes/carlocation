@@ -7,6 +7,8 @@ import { useRole } from "@/hooks/use-role";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ImageGallery } from "@/components/shared/image-gallery";
+import { ImageUploader } from "@/components/shared/image-uploader";
 import {
   Plus,
   Search,
@@ -16,9 +18,6 @@ import {
   Download,
   X,
   Eye,
-  ImagePlus,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { useState, useMemo, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -294,7 +293,6 @@ function FleetContent() {
   const [deleteCar, setDeleteCar] = useState<Car | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [viewCar, setViewCar] = useState<Car | null>(null);
-  const [galleryIndex, setGalleryIndex] = useState(0);
   const [uploadingImage, setUploadingImage] = useState(false);
   const queryClient = useQueryClient();
   // Stable "now" reference computed once per mount to satisfy purity rules
@@ -360,7 +358,6 @@ function FleetContent() {
       const { error } = await supabase.from("car_images").delete().eq("id", imageId);
       if (error) throw new Error(error.message);
       queryClient.invalidateQueries({ queryKey: ["car-images", viewCar.id] });
-      setGalleryIndex(0);
       toast.success("تم حذف الصورة");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "فشل الحذف");
@@ -578,7 +575,7 @@ function FleetContent() {
     return (
       <div className="space-y-6 animate-fade-in">
         <h1 className="text-2xl font-bold flex items-center gap-3">
-          <CarFront className="w-7 h-7 text-primary" /> الأسطول
+          <CarFront className="w-7 h-7 text-primary" /> السيارات
         </h1>
         <ErrorState icon={CarFront} />
       </div>
@@ -589,7 +586,7 @@ function FleetContent() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold flex items-center gap-3">
-          <CarFront className="w-7 h-7 text-primary" /> الأسطول
+          <CarFront className="w-7 h-7 text-primary" /> السيارات
         </h1>
         <div className="flex items-center gap-2">
           <Button
@@ -982,79 +979,15 @@ function FleetContent() {
         {viewCar && (
           <div className="space-y-4">
             {/* Image Gallery */}
-            <div className="rounded-xl overflow-hidden border border-border bg-surface">
-              {carImages && carImages.length > 0 ? (
-                <div className="relative group">
-                  <img
-                    src={carImages[galleryIndex]?.url}
-                    alt={`${viewCar.brand} ${viewCar.model}`}
-                    className="w-full h-48 object-cover"
-                  />
-                  {carImages.length > 1 && (
-                    <>
-                      <button
-                        onClick={() => setGalleryIndex((i) => (i - 1 + carImages.length) % carImages.length)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setGalleryIndex((i) => (i + 1) % carImages.length)}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-                        {carImages.map((_, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => setGalleryIndex(idx)}
-                            className={`w-1.5 h-1.5 rounded-full transition-all ${idx === galleryIndex ? "bg-white w-4" : "bg-white/40"}`}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {isManager && (
-                    <button
-                      onClick={() => handleImageDelete(carImages[galleryIndex].id)}
-                      className="absolute top-2 left-2 w-7 h-7 rounded-full bg-danger/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="حذف الصورة"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="h-48 flex flex-col items-center justify-center text-muted">
-                  <CarFront className="w-12 h-12 mb-2 opacity-30" />
-                  <p className="text-xs">لا توجد صور</p>
-                </div>
-              )}
-              {isManager && (
-                <label className="flex items-center justify-center gap-2 py-2 border-t border-border cursor-pointer hover:bg-surface-hover transition-colors text-xs text-muted">
-                  {uploadingImage ? (
-                    <span>جاري الرفع...</span>
-                  ) : (
-                    <>
-                      <ImagePlus className="w-4 h-4" />
-                      <span>إضافة صورة</span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={uploadingImage}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-              )}
-            </div>
+            <ImageGallery
+              images={(carImages ?? []).map((img) => ({ id: img.id, url: img.url, caption: img.caption }))}
+              onDelete={isManager ? handleImageDelete : undefined}
+              canDelete={isManager}
+              height={240}
+            />
+            {isManager && (
+              <ImageUploader onUpload={handleImageUpload} disabled={uploadingImage} compact />
+            )}
 
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>

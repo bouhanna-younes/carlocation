@@ -1,0 +1,171 @@
+"use client";
+
+import { useState, useCallback, useRef } from "react";
+import { UploadCloud, Loader2, ImageIcon } from "lucide-react";
+import { compressImage, formatBytes } from "@/lib/image-compress";
+
+interface ImageUploaderProps {
+  onUpload: (file: File) => Promise<void>;
+  disabled?: boolean;
+  compact?: boolean;
+}
+
+export function ImageUploader({
+  onUpload,
+  disabled = false,
+  compact = false,
+}: ImageUploaderProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [progress, setProgress] = useState<{ original: number; compressed: number } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith("image/")) return;
+      setIsUploading(true);
+      setProgress({ original: file.size, compressed: file.size });
+
+      try {
+        const compressed = await compressImage(file, 1600, 500, 0.6);
+        setProgress({ original: file.size, compressed: compressed.size });
+        await onUpload(compressed);
+      } finally {
+        setIsUploading(false);
+        setTimeout(() => setProgress(null), 1500);
+      }
+    },
+    [onUpload],
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      if (disabled || isUploading) return;
+      const file = e.dataTransfer.files?.[0];
+      if (file) handleFile(file);
+    },
+    [disabled, isUploading, handleFile],
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  if (compact) {
+    return (
+      <>
+        <label
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          className={`flex items-center justify-center gap-2 py-2.5 border-t border-border cursor-pointer transition-all ${
+            isDragging
+              ? "bg-primary/10 border-primary"
+              : "hover:bg-surface-hover"
+          } ${disabled || isUploading ? "opacity-50 cursor-not-allowed" : ""}`}
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <span className="text-xs text-muted">
+                {progress
+                  ? `${formatBytes(progress.original)} → ${formatBytes(progress.compressed)}`
+                  : "جاري المعالجة..."}
+              </span>
+            </>
+          ) : (
+            <>
+              <UploadCloud className="w-4 h-4 text-primary" />
+              <span className="text-xs text-muted">رفع صورة (اسحب أو انقر)</span>
+            </>
+          )}
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={disabled || isUploading}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      </>
+    );
+  }
+
+  return (
+    <div
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onClick={() => !disabled && !isUploading && inputRef.current?.click()}
+      className={`relative rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center p-8 ${
+        isDragging
+          ? "border-primary bg-primary/5 scale-[1.02]"
+          : "border-border hover:border-primary/40 hover:bg-surface-hover"
+      } ${disabled || isUploading ? "opacity-60 cursor-not-allowed" : ""}`}
+      style={{ minHeight: 180 }}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        disabled={disabled || isUploading}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+          e.target.value = "";
+        }}
+      />
+
+      {isUploading ? (
+        <div className="flex flex-col items-center gap-3">
+          <div className="relative w-16 h-16">
+            <div className="absolute inset-0 rounded-full border-4 border-border" />
+            <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+            <ImageIcon className="w-6 h-6 text-primary absolute inset-0 m-auto" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">جاري الضغط والرفع...</p>
+            {progress && (
+              <p className="text-xs text-muted">
+                {formatBytes(progress.original)} →{" "}
+                <span className="text-success font-medium">
+                  {formatBytes(progress.compressed)}
+                </span>
+                <span className="text-success">
+                  {" "}
+                  ({Math.round((1 - progress.compressed / progress.original) * 100)}% توفير)
+                </span>
+              </p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <UploadCloud className="w-7 h-7 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">اسحب الصورة هنا أو انقر للاختيار</p>
+            <p className="text-xs text-muted mt-1">
+              سيتم ضغط الصورة تلقائياً مع الحفاظ على الجودة (حد أقصى 500KB)
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -46,7 +46,7 @@ const navGroups: NavGroup[] = [
   {
     label: "الإدارة",
     items: [
-      { href: "/fleet", label: "الأسطول", icon: Car },
+      { href: "/fleet", label: "السيارات", icon: Car },
       { href: "/customers", label: "العملاء", icon: Users },
       { href: "/rentals", label: "الكراء", icon: KeyRound },
       { href: "/tracking", label: "التتبع", icon: MapPin },

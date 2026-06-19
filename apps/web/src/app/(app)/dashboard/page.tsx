@@ -682,7 +682,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">لوحة التحكم</h1>
-          <p className="text-sm text-muted mt-1">نظرة عامة على أداء الأسطول</p>
+          <p className="text-sm text-muted mt-1">نظرة عامة على أداء السيارات</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted hidden sm:block">
@@ -877,7 +877,7 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-base font-semibold">توزيع الأسطول</h3>
+              <h3 className="text-base font-semibold">توزيع السيارات</h3>
               <p className="text-xs text-muted mt-0.5">حسب الحالة</p>
             </div>
           </div>
