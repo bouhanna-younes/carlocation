@@ -5,7 +5,9 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/lib/supabase/client";
 import {
   Mail,
   Lock,
@@ -14,6 +16,8 @@ import {
   Zap,
   Radar,
   ArrowRight,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,7 +32,20 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const emailRef = useRef<HTMLInputElement | null>(null);
+
+  // Fetch platform name from settings via public RPC (works pre-auth)
+  const { data: settings } = useQuery<{ name?: string }>({
+    queryKey: ["settings", "platform-info"],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_platform_name");
+      return { name: (data as string) || "CarLocation" };
+    },
+    retry: false,
+    staleTime: Infinity,
+  });
+  const platformName = settings?.name || "CarLocation";
 
   const {
     register,
@@ -121,7 +138,7 @@ export default function LoginPage() {
           {/* Branding */}
           <div className="flex justify-between items-end">
             <span className="text-xs tracking-[0.2em] text-muted/50 uppercase font-semibold">
-              CarLocation Enterprise
+              {platformName} Enterprise
             </span>
             <span className="w-16 h-1 bg-primary rounded-full shadow-[0_0_10px_var(--color-primary-glow)]" />
           </div>
@@ -139,7 +156,7 @@ export default function LoginPage() {
             <div className="w-12 h-12 rounded-2xl bg-surface border border-border flex items-center justify-center">
               <KeyRound className="w-6 h-6 text-primary" />
             </div>
-            <span className="text-xl font-bold gradient-text">CarLocation</span>
+            <span className="text-xl font-bold gradient-text">{platformName}</span>
           </div>
 
           {/* Brand Icon */}
@@ -196,31 +213,29 @@ export default function LoginPage() {
               </div>
               <input
                 {...register("password")}
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 dir="rtl"
-                className="w-full bg-surface text-foreground border border-border rounded-xl py-4 pr-12 pl-4 text-right focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-sm placeholder:text-muted/60 input-glow"
+                className="w-full bg-surface text-foreground border border-border rounded-xl py-4 pr-12 pl-12 text-right focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-sm placeholder:text-muted/60 input-glow"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute inset-y-0 left-0 pl-4 flex items-center text-muted hover:text-foreground transition-colors"
+                aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
               {errors.password && (
                 <p className="text-danger text-xs mt-1.5 flex items-center gap-1">
                   <span className="w-1 h-1 bg-danger rounded-full" />
                   {errors.password.message}
                 </p>
               )}
-            </div>
-
-            {/* Options Row */}
-            <div className="flex items-center justify-end w-full">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-sm text-muted hover:text-foreground transition-colors">
-                  تذكرني
-                </span>
-                <input
-                  type="checkbox"
-                  defaultChecked
-                  className="w-5 h-5 rounded border-border bg-surface text-primary focus:ring-primary focus:ring-offset-background cursor-pointer"
-                />
-              </label>
             </div>
 
             {/* Submit */}
