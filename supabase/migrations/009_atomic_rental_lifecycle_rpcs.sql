@@ -53,11 +53,13 @@ BEGIN
       total_amount = v_final_amount
   WHERE id = p_rental_id;
 
-  -- 2. Update invoice
+  -- 2. Update invoice — mark as paid (customer pays on return)
   UPDATE public.invoices
   SET return_date = v_now,
       total_days = v_used_days,
-      total_amount = v_final_amount
+      total_amount = v_final_amount,
+      status = 'paid',
+      paid_amount = v_final_amount
   WHERE rental_id = p_rental_id;
 
   -- 3. Update car status

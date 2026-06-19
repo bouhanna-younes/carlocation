@@ -66,15 +66,16 @@ export default function ReportsPage() {
           revenue: r.revenue ?? 0,
         })));
       }
-      // Fallback: client-side aggregation
+      // Fallback: client-side aggregation from completed rentals
       const yearStart = new Date(selectedYear, 0, 1).toISOString();
       const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59).toISOString();
       const { data: rentals, error: rErr } = await supabase
         .from("rentals")
-        .select("total_amount, created_at")
-        .gte("created_at", yearStart)
-        .lte("created_at", yearEnd)
-        .returns<{ total_amount: number | null; created_at: string }[]>();
+        .select("total_amount, return_date")
+        .eq("status", "completed")
+        .gte("return_date", yearStart)
+        .lte("return_date", yearEnd)
+        .returns<{ total_amount: number | null; return_date: string | null }[]>();
       if (rErr) return [];
       const monthNames = ["جانفي", "فيفري", "مارس", "أفريل", "ماي", "جوان", "جويلية", "أوت", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
       return monthNames.map((month, i) => {
@@ -82,7 +83,8 @@ export default function ReportsPage() {
         const mEnd = new Date(selectedYear, i + 1, 0);
         const revenue = (rentals ?? [])
           .filter((r) => {
-            const d = new Date(r.created_at);
+            if (!r.return_date) return false;
+            const d = new Date(r.return_date);
             return d >= mStart && d <= mEnd;
           })
           .reduce((s, r) => s + (r.total_amount ?? 0), 0);

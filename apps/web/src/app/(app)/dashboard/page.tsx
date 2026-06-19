@@ -326,16 +326,21 @@ export default function DashboardPage() {
         supabase
           .from("rentals")
           .select("total_amount")
-          .gte("created_at", monthStart.toISOString()),
+          .eq("status", "completed")
+          .gte("return_date", monthStart.toISOString())
+          .lte("return_date", now.toISOString()),
         supabase
           .from("rentals")
           .select("total_amount")
-          .gte("created_at", lastMonthStart.toISOString())
-          .lte("created_at", lastMonthEnd.toISOString()),
+          .eq("status", "completed")
+          .gte("return_date", lastMonthStart.toISOString())
+          .lte("return_date", lastMonthEnd.toISOString()),
         supabase
           .from("rentals")
           .select("total_amount")
-          .gte("created_at", yearStart.toISOString()),
+          .eq("status", "completed")
+          .gte("return_date", yearStart.toISOString())
+          .lte("return_date", now.toISOString()),
         supabase
           .from("invoices")
           .select("total_amount")
@@ -589,8 +594,8 @@ export default function DashboardPage() {
   ];
 
   const fleetData = [
-    { name: "متاحة", value: kpis?.availableCars ?? 0, color: "#22c55e" },
-    { name: "مؤجرة", value: kpis?.rentedCars ?? 0, color: "#a78bfa" },
+    { name: "متاحة", value: kpis?.availableCars ?? 0, color: "#10b981" },
+    { name: "مؤجرة", value: kpis?.rentedCars ?? 0, color: "#6366f1" },
     { name: "صيانة", value: kpis?.maintenanceCars ?? 0, color: "#f59e0b" },
     {
       name: "خارج الخدمة",
@@ -878,17 +883,18 @@ export default function DashboardPage() {
           </div>
           {fleetData.length > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
                     data={fleetData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={72}
+                    innerRadius={55}
+                    outerRadius={85}
                     dataKey="value"
-                    strokeWidth={0}
-                    paddingAngle={3}
+                    strokeWidth={2}
+                    stroke="var(--color-surface)"
+                    paddingAngle={2}
                   >
                     {fleetData.map((entry, idx) => (
                       <Cell key={idx} fill={entry.color} />

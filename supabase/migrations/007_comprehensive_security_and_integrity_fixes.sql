@@ -532,10 +532,14 @@ BEGIN
          COUNT(*) FILTER (WHERE status = 'overdue')
   INTO v_active_rentals, v_overdue_rentals;
 
+  -- Revenue: sum of total_amount for COMPLETED rentals by return_date
+  -- (a rental is "revenue" only when the car is returned and the
+  --  final amount is determined)
   SELECT
-    COALESCE(SUM(total_amount) FILTER (WHERE status = 'paid' AND date_trunc('month', invoice_date) = date_trunc('month', now())), 0),
-    COALESCE(SUM(total_amount) FILTER (WHERE status = 'paid' AND date_trunc('month', invoice_date) = date_trunc('month', now() - INTERVAL '1 month')), 0),
-    COALESCE(SUM(total_amount) FILTER (WHERE status = 'paid' AND date_trunc('year', invoice_date) = date_trunc('year', now())), 0)
+    COALESCE(SUM(total_amount) FILTER (WHERE status = 'completed' AND date_trunc('month', return_date) = date_trunc('month', now())), 0),
+    COALESCE(SUM(total_amount) FILTER (WHERE status = 'completed' AND date_trunc('month', return_date) = date_trunc('month', now() - INTERVAL '1 month')), 0),
+    COALESCE(SUM(total_amount) FILTER (WHERE status = 'completed' AND date_trunc('year', return_date) = date_trunc('year', now())), 0)
+  FROM public.rentals
   INTO v_revenue_this_month, v_revenue_last_month, v_revenue_ytd;
 
   SELECT COUNT(*), COALESCE(SUM(total_amount), 0)
@@ -581,16 +585,16 @@ BEGIN
   SELECT
     m.month_index,
     m.month_label,
-    COALESCE(SUM(i.total_amount), 0)::NUMERIC(12,2) AS revenue,
-    COUNT(i.id)::INTEGER AS count
+    COALESCE(SUM(r.total_amount), 0)::NUMERIC(12,2) AS revenue,
+    COUNT(r.id)::INTEGER AS count
   FROM (
     VALUES (1, 'جانفي'), (2, 'فيفري'), (3, 'مارس'), (4, 'أفريل'),
            (5, 'ماي'), (6, 'جوان'), (7, 'جويلية'), (8, 'أوت'),
            (9, 'سبتمبر'), (10, 'أكتوبر'), (11, 'نوفمبر'), (12, 'ديسمبر')
   ) AS m(month_index, month_label)
-  LEFT JOIN public.invoices i ON EXTRACT(MONTH FROM i.invoice_date)::INT = m.month_index
-                                AND EXTRACT(YEAR FROM i.invoice_date)::INT = v_year
-                                AND i.status = 'paid'
+  LEFT JOIN public.rentals r ON EXTRACT(MONTH FROM r.return_date)::INT = m.month_index
+                                AND EXTRACT(YEAR FROM r.return_date)::INT = v_year
+                                AND r.status = 'completed'
   GROUP BY m.month_index, m.month_label
   ORDER BY m.month_index;
 END;
@@ -612,11 +616,10 @@ BEGIN
     c.brand,
     c.model,
     c.plate_number,
-    COALESCE(SUM(i.total_amount), 0)::NUMERIC(12,2) AS total_revenue,
+    COALESCE(SUM(r.total_amount), 0)::NUMERIC(12,2) AS total_revenue,
     COUNT(r.id)::INTEGER AS rentals_count
   FROM public.cars c
   LEFT JOIN public.rentals r ON r.car_id = c.id AND r.status = 'completed'
-  LEFT JOIN public.invoices i ON i.rental_id = r.id AND i.status = 'paid'
   GROUP BY c.id, c.brand, c.model, c.plate_number
   ORDER BY total_revenue DESC
   LIMIT p_limit;
@@ -638,11 +641,10 @@ BEGIN
     cu.id AS customer_id,
     cu.first_name,
     cu.last_name,
-    COALESCE(SUM(i.total_amount), 0)::NUMERIC(12,2) AS total_spent,
+    COALESCE(SUM(r.total_amount), 0)::NUMERIC(12,2) AS total_spent,
     COUNT(r.id)::INTEGER AS rentals_count
   FROM public.customers cu
   LEFT JOIN public.rentals r ON r.customer_id = cu.id AND r.status = 'completed'
-  LEFT JOIN public.invoices i ON i.rental_id = r.id AND i.status = 'paid'
   GROUP BY cu.id, cu.first_name, cu.last_name
   ORDER BY total_spent DESC
   LIMIT p_limit;
@@ -666,11 +668,10 @@ BEGIN
     COUNT(r.id)::INTEGER AS total_rentals,
     COUNT(r.id) FILTER (WHERE r.status = 'active')::INTEGER AS active_rentals,
     COUNT(r.id) FILTER (WHERE r.status = 'completed')::INTEGER AS completed_rentals,
-    COALESCE(SUM(i.total_amount) FILTER (WHERE i.status = 'paid'), 0)::NUMERIC(12,2) AS total_spent,
-    COALESCE(SUM(i.total_amount) FILTER (WHERE i.status = 'pending'), 0)::NUMERIC(12,2) AS outstanding
+    COALESCE(SUM(r.total_amount) FILTER (WHERE r.status = 'completed'), 0)::NUMERIC(12,2) AS total_spent,
+    COALESCE(SUM(r.total_amount) FILTER (WHERE r.status = 'active' OR r.status = 'overdue'), 0)::NUMERIC(12,2) AS outstanding
   FROM public.customers cu
   LEFT JOIN public.rentals r ON r.customer_id = cu.id
-  LEFT JOIN public.invoices i ON i.rental_id = r.id
   GROUP BY cu.id;
 END;
 $$;

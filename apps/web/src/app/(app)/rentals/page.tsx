@@ -309,6 +309,8 @@ export default function RentalsPage() {
           return_date: now.toISOString(),
           total_days: usedDays,
           total_amount: finalAmount,
+          status: "paid",
+          paid_amount: finalAmount,
         } as never)
         .eq("rental_id", id);
       if (invError) console.error("Invoice update failed:", invError.message);
