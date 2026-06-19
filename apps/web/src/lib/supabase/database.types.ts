@@ -21,6 +21,13 @@ export type Transmission = "manual" | "automatic";
 export type RentalStatus = "active" | "completed" | "overdue" | "cancelled" | "reserved";
 export type MaintenanceStatus = "pending" | "in_progress" | "completed" | "cancelled";
 export type Priority = "low" | "medium" | "high" | "critical";
+
+export type FuelLevel = "full" | "half" | "quarter" | "low";
+
+export interface ScratchEntry {
+  location: string;
+  description: string;
+}
 export type NotificationType = "info" | "success" | "warning" | "error";
 export type InvoiceStatus = "pending" | "paid" | "refunded" | "cancelled";
 export type UserRole = "manager" | "worker";
@@ -116,6 +123,23 @@ export interface Database {
         vignette_expiry?: string;
         inspection_expiry?: string;
       }>;
+      car_images: TableDefinition<{
+        id: string;
+        car_id: string;
+        url: string;
+        caption: string | null;
+        sort_order: number;
+        created_at: string;
+      }, {
+        car_id: string;
+        url: string;
+        caption?: string;
+        sort_order?: number;
+      }, {
+        url?: string;
+        caption?: string;
+        sort_order?: number;
+      }>;
       customers: TableDefinition<{
         id: string;
         first_name: string;
@@ -184,6 +208,13 @@ export interface Database {
         notes: string | null;
         discount_percent: number | null;
         discount_reason: string | null;
+        amount_paid: number | null;
+        fuel_level_start: FuelLevel | null;
+        fuel_level_end: FuelLevel | null;
+        is_washed_start: boolean;
+        is_washed_end: boolean;
+        scratches_start: Json | null;
+        scratches_end: Json | null;
         created_at: string;
         updated_at: string;
       }, {
@@ -201,6 +232,10 @@ export interface Database {
         notes?: string;
         discount_percent?: number;
         discount_reason?: string;
+        amount_paid?: number;
+        fuel_level_start?: FuelLevel;
+        is_washed_start?: boolean;
+        scratches_start?: Json;
       }, {
         return_date?: string;
         total_amount?: number;
@@ -214,6 +249,10 @@ export interface Database {
         discount_percent?: number;
         discount_reason?: string;
         end_date?: string;
+        amount_paid?: number;
+        fuel_level_end?: FuelLevel;
+        is_washed_end?: boolean;
+        scratches_end?: Json;
       }>;
       maintenance: TableDefinition<{
         id: string;

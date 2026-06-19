@@ -132,6 +132,16 @@ function InvoicePrintView({ invoice }: { invoice: Invoice }) {
             <span className="text-muted">المبلغ الإجمالي:</span>
             <span className="font-medium">{new Intl.NumberFormat("ar-DZ").format(invoice.totalAmount)} DZD</span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-muted">المبلغ المدفوع:</span>
+            <span className="font-medium text-emerald-400">{new Intl.NumberFormat("ar-DZ").format(invoice.paidAmount)} DZD</span>
+          </div>
+          {invoice.totalAmount - invoice.paidAmount > 0 && (
+            <div className="flex justify-between border-t border-border pt-2">
+              <span className="text-muted font-medium">المبلغ المتبقي:</span>
+              <span className="font-bold text-warning">{new Intl.NumberFormat("ar-DZ").format(invoice.totalAmount - invoice.paidAmount)} DZD</span>
+            </div>
+          )}
           {invoice.depositAmount > 0 && (
             <div className="flex justify-between">
               <span className="text-muted">الوديعة:</span>

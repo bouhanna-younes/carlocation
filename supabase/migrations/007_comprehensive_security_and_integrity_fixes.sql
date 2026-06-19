@@ -94,7 +94,9 @@ BEGIN
       v_invoice_number, now(),
       NEW.start_date, NEW.end_date,
       NEW.daily_rate, v_total_days, v_total_amount,
-      COALESCE(NEW.deposit_amount, 0), 'pending', 0
+      COALESCE(NEW.deposit_amount, 0),
+      CASE WHEN COALESCE(NEW.amount_paid, 0) >= v_total_amount THEN 'paid' ELSE 'pending' END,
+      COALESCE(NEW.amount_paid, 0)
     );
 
     RETURN NEW;

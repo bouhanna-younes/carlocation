@@ -7,6 +7,8 @@ import type {
   NotificationType,
   InvoiceStatus,
   Json,
+  FuelLevel,
+  ScratchEntry,
   CarRow,
   CustomerRow,
   RentalRow,
@@ -211,6 +213,36 @@ export function toCarUpdate(data: Partial<Car>): CarUpdate {
 }
 
 // =====================================================
+// CAR IMAGE
+// =====================================================
+export interface CarImage {
+  id: string;
+  carId: string;
+  url: string;
+  caption?: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export function mapCarImage(row: {
+  id: string;
+  car_id: string;
+  url: string;
+  caption: string | null;
+  sort_order: number;
+  created_at: string;
+}): CarImage {
+  return {
+    id: row.id,
+    carId: row.car_id,
+    url: row.url,
+    caption: row.caption ?? undefined,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+  };
+}
+
+// =====================================================
 // CUSTOMER
 // =====================================================
 type SupabaseCustomer = CustomerRow;
@@ -319,6 +351,13 @@ export interface Rental {
   notes?: string;
   discountPercent?: number;
   discountReason?: string;
+  amountPaid?: number;
+  fuelLevelStart?: FuelLevel;
+  fuelLevelEnd?: FuelLevel;
+  isWashedStart?: boolean;
+  isWashedEnd?: boolean;
+  scratchesStart?: ScratchEntry[];
+  scratchesEnd?: ScratchEntry[];
   createdAt: string;
   updatedAt: string;
   customer?: Customer;
@@ -350,6 +389,13 @@ export function mapRental(row: RentalRowWithJoins): Rental {
     notes: row.notes ?? undefined,
     discountPercent: row.discount_percent ?? undefined,
     discountReason: row.discount_reason ?? undefined,
+    amountPaid: row.amount_paid ?? undefined,
+    fuelLevelStart: row.fuel_level_start ?? undefined,
+    fuelLevelEnd: row.fuel_level_end ?? undefined,
+    isWashedStart: row.is_washed_start ?? undefined,
+    isWashedEnd: row.is_washed_end ?? undefined,
+    scratchesStart: (row.scratches_start as unknown as ScratchEntry[]) ?? undefined,
+    scratchesEnd: (row.scratches_end as unknown as ScratchEntry[]) ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     customer: row.customer ? mapCustomer(row.customer) : undefined,

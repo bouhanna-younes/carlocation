@@ -31,11 +31,13 @@ import { exportToCSV } from "@/lib/export-csv";
 import { useRealtime } from "@/hooks/use-realtime";
 import {
   RentalForm,
+  ReturnRentalForm,
   editRentalSchema,
   cancelSchema,
   type RentalFormData,
   type EditRentalFormData,
   type CancelFormData,
+  type ReturnRentalFormData,
 } from "./rental-forms";
 
 export default function RentalsPage() {
@@ -216,6 +218,10 @@ export default function RentalsPage() {
         notes: data.notes || null,
         discount_percent: discount || null,
         discount_reason: data.discountReason || null,
+        amount_paid: data.amountPaid || 0,
+        fuel_level_start: data.fuelLevelStart || null,
+        is_washed_start: data.isWashedStart ?? false,
+        scratches_start: (data.scratchesStart ?? []).filter(s => s.location) as unknown as never,
       } as never);
       if (error) throw new Error(error.message);
       const { error: carErr } = await supabase
@@ -267,13 +273,20 @@ export default function RentalsPage() {
   });
 
   const returnMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, formData }: { id: string; formData: ReturnRentalFormData }) => {
       const rental = rentals?.find((r) => r.id === id);
       if (!rental) throw new Error("الكراء غير موجود");
 
-      // Try the server-side RPC first (migration 009 — atomic, bypasses RLS)
+      const scratchesEnd = (formData.scratchesEnd ?? []).filter((s) => s.location);
+
+      // Try the server-side RPC first (migration 010 — atomic, bypasses RLS)
       const { data: rpcResult, error: rpcError } = await supabase.rpc("return_rental", {
         p_rental_id: id,
+        p_end_mileage: formData.endMileage,
+        p_fuel_level_end: formData.fuelLevelEnd,
+        p_is_washed_end: formData.isWashedEnd ?? false,
+        p_scratches_end: scratchesEnd.length > 0 ? JSON.stringify(scratchesEnd) : null,
+        p_additional_payment: formData.additionalPayment ?? 0,
       });
       if (!rpcError && rpcResult) {
         const result = rpcResult as Record<string, unknown>;
@@ -288,18 +301,22 @@ export default function RentalsPage() {
       const startDate = new Date(rental.startDate);
       const elapsedMs = now.getTime() - startDate.getTime();
       const usedDays = Math.max(1, Math.ceil(elapsedMs / 86400000));
-
-      // Apply discount
       const discountPercent = rental.discountPercent ?? 0;
       const effectiveRate = rental.dailyRate * (1 - discountPercent / 100);
       const finalAmount = Math.round(usedDays * effectiveRate);
+      const totalPaid = (rental.amountPaid ?? 0) + (formData.additionalPayment as number ?? 0);
 
       const { error } = await supabase.from("rentals")
         .update({
           status: "completed",
           return_date: now.toISOString(),
           total_amount: finalAmount,
-        })
+          end_mileage: formData.endMileage,
+          fuel_level_end: formData.fuelLevelEnd,
+          is_washed_end: formData.isWashedEnd ?? false,
+          scratches_end: scratchesEnd as unknown as never,
+          amount_paid: totalPaid,
+        } as never)
         .eq("id", id);
       if (error) throw new Error(error.message);
 
@@ -924,38 +941,16 @@ export default function RentalsPage() {
         }}
         title="إرجاع السيارة"
       >
-        <div className="space-y-4">
-          <p className="text-sm text-muted">
-            هل أنت متأكد من إرجاع السيارة في كراء{" "}
-            <strong className="text-foreground">
-              {returnRental?.carBrand} {returnRental?.carModel}
-            </strong>{" "}
-            للعميل{" "}
-            <strong className="text-foreground">
-              {returnRental?.customerName}
-            </strong>
-            ؟
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setReturnRental(null)}
-            >
-              إلغاء
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                if (returnRental) returnMutation.mutate(returnRental.id);
-              }}
-              disabled={returnMutation.isPending}
-              loading={returnMutation.isPending}
-            >
-              {returnMutation.isPending ? "جاري الإرجاع..." : "إرجاع"}
-            </Button>
-          </div>
-        </div>
+        {returnRental && (
+          <ReturnRentalForm
+            rental={returnRental}
+            onSubmit={(formData) =>
+              returnMutation.mutate({ id: returnRental.id, formData })
+            }
+            onCancel={() => setReturnRental(null)}
+            isLoading={returnMutation.isPending}
+          />
+        )}
       </Modal>
 
       <Modal
