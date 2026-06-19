@@ -270,6 +270,7 @@ export default function RentalsPage() {
       const usedDays = Math.max(1, Math.ceil(elapsedDays));
       const finalAmount = usedDays * rental.dailyRate;
 
+      // 1. Update the rental
       const { error } = await supabase.from("rentals")
         .update({
           status: "completed",
@@ -279,6 +280,21 @@ export default function RentalsPage() {
         })
         .eq("id", id);
       if (error) throw new Error(error.message);
+
+      // 2. Update the invoice directly (fallback if DB trigger not deployed)
+      const { error: invError } = await supabase
+        .from("invoices")
+        .update({
+          return_date: now.toISOString(),
+          total_days: usedDays,
+          total_amount: finalAmount,
+        } as never)
+        .eq("rental_id", id);
+      if (invError) {
+        console.error("Invoice update failed (trigger may handle it):", invError.message);
+      }
+
+      // 3. Set car status back to available
       if (rental?.carId) {
         await supabase.from("cars")
           .update({ status: "available" } as never)
@@ -291,6 +307,7 @@ export default function RentalsPage() {
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["recent-rentals"] });
       queryClient.invalidateQueries({ queryKey: ["revenue-chart"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
 
       // Create return notification
       if (returnRental?.carId) {
@@ -330,13 +347,15 @@ export default function RentalsPage() {
       // Full days used (for billing) + 35% penalty
       const usedDays = Math.max(1, Math.ceil(elapsedDays));
       const usedAmount = usedDays * rental.dailyRate;
-      const penalty = usedAmount * 0.35;
-      const totalAmount = usedAmount + penalty;
+      const penaltyPercent = 35;
+      const penaltyAmount = Math.round(usedAmount * (penaltyPercent / 100));
+      const totalAmount = usedAmount + penaltyAmount;
 
       const notes = reason
-        ? `ملغى: ${reason} | استُخدم ${usedDays} يوم | غرامة 35%: ${penalty} DZD`
-        : `استُخدم ${usedDays} يوم | غرامة 35%: ${penalty} DZD`;
+        ? `ملغى: ${reason} | استُخدم ${usedDays} يوم | غرامة 35%: ${penaltyAmount} DZD`
+        : `استُخدم ${usedDays} يوم | غرامة 35%: ${penaltyAmount} DZD`;
 
+      // 1. Update the rental
       const { error } = await supabase.from("rentals")
         .update({
           status: "cancelled",
@@ -345,6 +364,26 @@ export default function RentalsPage() {
         })
         .eq("id", id);
       if (error) throw new Error(error.message);
+
+      // 2. Update the invoice directly (fallback if DB trigger not deployed)
+      const refundAmount = Math.max(0, (rental.depositAmount ?? 0) - penaltyAmount);
+      const { error: invError } = await supabase
+        .from("invoices")
+        .update({
+          is_cancelled: true,
+          cancelled_at: now.toISOString(),
+          penalty_percent: penaltyPercent,
+          penalty_amount: penaltyAmount,
+          refund_amount: refundAmount,
+          total_amount: totalAmount,
+          status: "cancelled",
+        } as never)
+        .eq("rental_id", id);
+      if (invError) {
+        console.error("Invoice cancel update failed (trigger may handle it):", invError.message);
+      }
+
+      // 3. Set car status back to available
       if (rental?.carId) {
         await supabase.from("cars")
           .update({ status: "available" } as never)
@@ -356,6 +395,7 @@ export default function RentalsPage() {
       queryClient.invalidateQueries({ queryKey: ["available-cars"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["recent-rentals"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
 
       // Create cancel notification
       if (cancelRental?.carId) {
