@@ -8,32 +8,57 @@ interface ImageUploaderProps {
   onUpload: (file: File) => Promise<void>;
   disabled?: boolean;
   compact?: boolean;
+  multiple?: boolean;
 }
 
 export function ImageUploader({
   onUpload,
   disabled = false,
   compact = false,
+  multiple = false,
 }: ImageUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [progress, setProgress] = useState<{ original: number; compressed: number } | null>(null);
+  const [progress, setProgress] = useState<{
+    current: number;
+    total: number;
+    original: number;
+    compressed: number;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback(
-    async (file: File) => {
-      if (!file.type.startsWith("image/")) return;
-      setIsUploading(true);
-      setProgress({ original: file.size, compressed: file.size });
+  const handleFiles = useCallback(
+    async (files: FileList) => {
+      const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
+      if (imageFiles.length === 0) return;
 
-      try {
-        const compressed = await compressImage(file, 1600, 500, 0.6);
-        setProgress({ original: file.size, compressed: compressed.size });
-        await onUpload(compressed);
-      } finally {
-        setIsUploading(false);
-        setTimeout(() => setProgress(null), 1500);
+      setIsUploading(true);
+
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        setProgress({
+          current: i + 1,
+          total: imageFiles.length,
+          original: file.size,
+          compressed: file.size,
+        });
+
+        try {
+          const compressed = await compressImage(file, 1600, 500, 0.6);
+          setProgress({
+            current: i + 1,
+            total: imageFiles.length,
+            original: file.size,
+            compressed: compressed.size,
+          });
+          await onUpload(compressed);
+        } catch {
+          // Continue to next file even if one fails
+        }
       }
+
+      setIsUploading(false);
+      setTimeout(() => setProgress(null), 1500);
     },
     [onUpload],
   );
@@ -43,10 +68,10 @@ export function ImageUploader({
       e.preventDefault();
       setIsDragging(false);
       if (disabled || isUploading) return;
-      const file = e.dataTransfer.files?.[0];
-      if (file) handleFile(file);
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) handleFiles(files);
     },
-    [disabled, isUploading, handleFile],
+    [disabled, isUploading, handleFiles],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -59,48 +84,51 @@ export function ImageUploader({
     setIsDragging(false);
   }, []);
 
+  const inputProps = {
+    ref: inputRef,
+    type: "file" as const,
+    accept: "image/*",
+    multiple,
+    className: "hidden",
+    disabled: disabled || isUploading,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (files && files.length > 0) handleFiles(files);
+      e.target.value = "";
+    },
+  };
+
   if (compact) {
     return (
-      <>
-        <label
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          className={`flex items-center justify-center gap-2 py-2.5 border-t border-border cursor-pointer transition-all ${
-            isDragging
-              ? "bg-primary/10 border-primary"
-              : "hover:bg-surface-hover"
-          } ${disabled || isUploading ? "opacity-50 cursor-not-allowed" : ""}`}
-        >
-          {isUploading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              <span className="text-xs text-muted">
-                {progress
-                  ? `${formatBytes(progress.original)} → ${formatBytes(progress.compressed)}`
-                  : "جاري المعالجة..."}
-              </span>
-            </>
-          ) : (
-            <>
-              <UploadCloud className="w-4 h-4 text-primary" />
-              <span className="text-xs text-muted">رفع صورة (اسحب أو انقر)</span>
-            </>
-          )}
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            disabled={disabled || isUploading}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFile(file);
-              e.target.value = "";
-            }}
-          />
-        </label>
-      </>
+      <label
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        className={`flex items-center justify-center gap-2 py-2.5 border-t border-border cursor-pointer transition-all ${
+          isDragging ? "bg-primary/10 border-primary" : "hover:bg-surface-hover"
+        } ${disabled || isUploading ? "opacity-50 cursor-not-allowed" : ""}`}
+      >
+        {isUploading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <span className="text-xs text-muted">
+              {progress
+                ? multiple && progress.total > 1
+                  ? `${progress.current}/${progress.total} — ${formatBytes(progress.original)} → ${formatBytes(progress.compressed)}`
+                  : `${formatBytes(progress.original)} → ${formatBytes(progress.compressed)}`
+                : "جاري المعالجة..."}
+            </span>
+          </>
+        ) : (
+          <>
+            <UploadCloud className="w-4 h-4 text-primary" />
+            <span className="text-xs text-muted">
+              {multiple ? "رفع صور (اسحب أو انقر)" : "رفع صورة (اسحب أو انقر)"}
+            </span>
+          </>
+        )}
+        <input {...inputProps} />
+      </label>
     );
   }
 
@@ -117,18 +145,7 @@ export function ImageUploader({
       } ${disabled || isUploading ? "opacity-60 cursor-not-allowed" : ""}`}
       style={{ minHeight: 180 }}
     >
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        disabled={disabled || isUploading}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleFile(file);
-          e.target.value = "";
-        }}
-      />
+      <input {...inputProps} />
 
       {isUploading ? (
         <div className="flex flex-col items-center gap-3">
@@ -138,7 +155,11 @@ export function ImageUploader({
             <ImageIcon className="w-6 h-6 text-primary absolute inset-0 m-auto" />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">جاري الضغط والرفع...</p>
+            <p className="text-sm font-medium text-foreground">
+              {multiple && progress && progress.total > 1
+                ? `جاري رفع ${progress.current} من ${progress.total} صور...`
+                : "جاري الضغط والرفع..."}
+            </p>
             {progress && (
               <p className="text-xs text-muted">
                 {formatBytes(progress.original)} →{" "}
@@ -159,9 +180,12 @@ export function ImageUploader({
             <UploadCloud className="w-7 h-7 text-primary" />
           </div>
           <div>
-            <p className="text-sm font-medium text-foreground">اسحب الصورة هنا أو انقر للاختيار</p>
+            <p className="text-sm font-medium text-foreground">
+              {multiple ? "اسحب الصور هنا أو انقر للاختيار" : "اسحب الصورة هنا أو انقر للاختيار"}
+            </p>
             <p className="text-xs text-muted mt-1">
-              سيتم ضغط الصورة تلقائياً مع الحفاظ على الجودة (حد أقصى 500KB)
+              {multiple ? "يمكن رفع عدة صور دفعة واحدة — " : ""}
+              سيتم ضغط الصور تلقائياً مع الحفاظ على الجودة (حد أقصى 500KB لكل صورة)
             </p>
           </div>
         </div>

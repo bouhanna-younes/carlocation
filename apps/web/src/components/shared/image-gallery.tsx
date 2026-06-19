@@ -25,6 +25,7 @@ export function ImageGallery({
   const [activeIndex, setActiveIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const next = useCallback(() => {
     setActiveIndex((i) => (i + 1) % images.length);
@@ -92,8 +93,7 @@ export function ImageGallery({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onDelete(active.id);
-                if (activeIndex > 0) setActiveIndex(activeIndex - 1);
+                setConfirmDelete(active.id);
               }}
               className="absolute top-3 left-3 w-9 h-9 rounded-full bg-danger/80 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-danger"
               title="حذف الصورة"
@@ -256,6 +256,47 @@ export function ImageGallery({
           {/* Counter */}
           <div className="absolute bottom-6 right-6 px-3 py-1.5 rounded-full bg-white/10 text-white text-xs font-medium z-10">
             {activeIndex + 1} / {images.length}
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation dialog */}
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center animate-fade-in"
+          onClick={() => setConfirmDelete(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-surface border border-border rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl"
+          >
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-danger/10 flex items-center justify-center">
+                <X className="w-7 h-7 text-danger" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-foreground mb-1">حذف الصورة</h3>
+                <p className="text-sm text-muted">هل أنت متأكد من حذف هذه الصورة نهائياً؟ لا يمكن التراجع.</p>
+              </div>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setConfirmDelete(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-surface-hover transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={() => {
+                    onDelete?.(confirmDelete);
+                    setConfirmDelete(null);
+                    if (activeIndex > 0) setActiveIndex((i) => i - 1);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-danger text-white text-sm font-medium hover:bg-danger/90 transition-colors"
+                >
+                  حذف
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

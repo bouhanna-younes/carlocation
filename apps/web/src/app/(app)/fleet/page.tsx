@@ -355,8 +355,30 @@ function FleetContent() {
   const handleImageDelete = async (imageId: string) => {
     if (!viewCar) return;
     try {
+      // Find the image URL to extract the storage path
+      const image = carImages?.find((img) => img.id === imageId);
+
+      // Delete from database first
       const { error } = await supabase.from("car_images").delete().eq("id", imageId);
       if (error) throw new Error(error.message);
+
+      // Delete from Supabase Storage
+      if (image) {
+        try {
+          // Extract the path from the public URL
+          // URL format: https://xxx.supabase.co/storage/v1/object/public/car-images/carId/timestamp.jpg
+          const urlObj = new URL(image.url);
+          const pathMatch = urlObj.pathname.match(/\/car-images\/(.+)$/);
+          if (pathMatch) {
+            const storagePath = pathMatch[1];
+            await supabase.storage.from("car-images").remove([storagePath]);
+          }
+        } catch {
+          // Storage deletion failed — DB row already deleted, not critical
+          console.warn("Storage cleanup failed for image:", imageId);
+        }
+      }
+
       queryClient.invalidateQueries({ queryKey: ["car-images", viewCar.id] });
       toast.success("تم حذف الصورة");
     } catch (e) {
@@ -986,7 +1008,7 @@ function FleetContent() {
               height={240}
             />
             {isManager && (
-              <ImageUploader onUpload={handleImageUpload} disabled={uploadingImage} compact />
+              <ImageUploader onUpload={handleImageUpload} disabled={uploadingImage} compact multiple />
             )}
 
             <div className="grid grid-cols-2 gap-3 text-sm">
