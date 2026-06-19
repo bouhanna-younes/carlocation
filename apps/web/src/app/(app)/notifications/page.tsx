@@ -25,10 +25,10 @@ type FilterType = "all" | "unread" | "read";
 
 // Categories that link to a car (for expiry notifications)
 const carLinkedCategories = [
-  "insurance_expiry",
-  "vignette_expiry",
-  "inspection_expiry",
-  "oil_change_expiry",
+  "insurance",
+  "vignette",
+  "inspection",
+  "oil_change",
 ];
 
 const typeIconMap: Record<

@@ -118,27 +118,66 @@ function ActivityIcon({ type }: { type: string }) {
     string,
     { icon: typeof Bell; color: string; bg: string }
   > = {
-    RENTAL_CREATED: {
+    rental_created: {
       icon: KeyRound,
       color: "text-secondary",
       bg: "bg-secondary/10",
     },
-    RENTAL_COMPLETED: {
+    rental_returned: {
       icon: CheckCircle,
       color: "text-success",
       bg: "bg-success/10",
     },
-    RENTAL_CANCELLED: {
+    rental_cancelled: {
       icon: XCircle,
       color: "text-danger",
       bg: "bg-danger/10",
     },
-    MAINTENANCE_DUE: {
+    insurance: {
       icon: AlertTriangle,
       color: "text-warning",
       bg: "bg-warning/10",
     },
-    CAR_ADDED: { icon: Car, color: "text-primary", bg: "bg-primary/10" },
+    oil_change: {
+      icon: Wrench,
+      color: "text-primary",
+      bg: "bg-primary/10",
+    },
+    vignette: {
+      icon: AlertTriangle,
+      color: "text-warning",
+      bg: "bg-warning/10",
+    },
+    inspection: {
+      icon: AlertTriangle,
+      color: "text-warning",
+      bg: "bg-warning/10",
+    },
+    license_expiry: {
+      icon: AlertTriangle,
+      color: "text-danger",
+      bg: "bg-danger/10",
+    },
+    rental_overdue: {
+      icon: AlertTriangle,
+      color: "text-danger",
+      bg: "bg-danger/10",
+    },
+    info: {
+      icon: Bell,
+      color: "text-primary",
+      bg: "bg-primary/10",
+    },
+    success: {
+      icon: CheckCircle,
+      color: "text-success",
+      bg: "bg-success/10",
+    },
+    warning: {
+      icon: AlertTriangle,
+      color: "text-warning",
+      bg: "bg-warning/10",
+    },
   };
   const config = icons[type] || {
     icon: Bell,
@@ -184,6 +223,7 @@ export default function DashboardPage() {
   useRealtime("maintenance");
   useRealtime("customers");
   useRealtime("notifications");
+  useRealtime("invoices");
 
   // Check expiry dates on dashboard load (once per hour, not on Realtime)
   const { data: expiryCount } = useQuery({
@@ -298,8 +338,8 @@ export default function DashboardPage() {
           .gte("created_at", yearStart.toISOString()),
         supabase
           .from("invoices")
-          .select("amount")
-          .eq("status", "unpaid"),
+          .select("total_amount")
+          .eq("status", "pending"),
         supabase
           .from("maintenance")
           .select("*", { head: true, count: "exact" })
@@ -313,7 +353,7 @@ export default function DashboardPage() {
       const revenueLastMonth =
         revenueLastMonthRes.data?.reduce((s, r) => s + (r.total_amount ?? 0), 0) ?? 0;
       const openInvoicesAmount =
-        openInvoicesRes.data?.reduce((s, r) => s + (r.amount ?? 0), 0) ?? 0;
+        openInvoicesRes.data?.reduce((s, r) => s + (r.total_amount ?? 0), 0) ?? 0;
 
       return {
         totalCars,

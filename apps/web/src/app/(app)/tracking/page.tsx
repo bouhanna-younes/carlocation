@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { MapPin, Search, X, AlertCircle, RefreshCw } from "lucide-react";
 import { useMemo, useCallback, useState, useEffect } from "react";
 import { useTableState } from "@/hooks/use-table-state";
+import { useRealtime } from "@/hooks/use-realtime";
 import { carStatusMap } from "@/lib/constants";
 
 interface TrackingCar {
@@ -24,6 +25,9 @@ interface TrackingCar {
 }
 
 export default function TrackingPage() {
+  useRealtime("tracking");
+  useRealtime("cars");
+
   const {
     data: cars,
     isLoading,

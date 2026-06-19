@@ -300,14 +300,21 @@ export default function MaintenancePage() {
       } as never);
       if (error) throw new Error(error.message);
 
-      // Update car status to maintenance
-      await supabase.from("cars")
-        .update({ status: "maintenance" })
-        .eq("id", data.carId);
+      // Only flip car to maintenance if the maintenance is starting immediately
+      // (no scheduled date, or scheduled for today). Scheduled future maintenance
+      // should not take the car out of service until work starts.
+      const shouldStartNow = !data.scheduledAt || new Date(data.scheduledAt) <= new Date();
+      if (shouldStartNow) {
+        const { error: carErr } = await supabase.from("cars")
+          .update({ status: "maintenance" })
+          .eq("id", data.carId);
+        if (carErr) console.error("Car status update failed:", carErr.message);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["maintenance"] });
       queryClient.invalidateQueries({ queryKey: ["cars"] });
+      queryClient.invalidateQueries({ queryKey: ["available-cars"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("تمت إضافة سجل الصيانة بنجاح");
       setAddOpen(false);
@@ -342,6 +349,7 @@ export default function MaintenancePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["maintenance"] });
       queryClient.invalidateQueries({ queryKey: ["cars"] });
+      queryClient.invalidateQueries({ queryKey: ["available-cars"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("تم إتمام الصيانة بنجاح");
       setConfirmComplete(null);
@@ -359,14 +367,17 @@ export default function MaintenancePage() {
 
       // Update car status to maintenance
       if (record?.carId) {
-        await supabase.from("cars")
+        const { error: carErr } = await supabase.from("cars")
           .update({ status: "maintenance" })
           .eq("id", record.carId);
+        if (carErr) console.error("Car status update failed:", carErr.message);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["maintenance"] });
       queryClient.invalidateQueries({ queryKey: ["cars"] });
+      queryClient.invalidateQueries({ queryKey: ["available-cars"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("تم بدء الصيانة");
     },
     onError: (err: Error) => toast.error(err.message),
@@ -399,6 +410,7 @@ export default function MaintenancePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["maintenance"] });
       queryClient.invalidateQueries({ queryKey: ["cars"] });
+      queryClient.invalidateQueries({ queryKey: ["available-cars"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("تم إلغاء الصيانة");
     },

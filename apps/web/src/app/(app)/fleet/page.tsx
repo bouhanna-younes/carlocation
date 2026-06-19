@@ -398,6 +398,9 @@ function FleetContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cars"] });
+      queryClient.invalidateQueries({ queryKey: ["available-cars"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-rentals"] });
       toast.success("تمت إضافة السيارة بنجاح");
       setAddOpen(false);
     },
@@ -414,6 +417,9 @@ function FleetContent() {
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["cars"] });
+      queryClient.invalidateQueries({ queryKey: ["available-cars"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["rentals"] });
       toast.success("تم تعديل السيارة بنجاح");
 
       // Mark linked notification as read after successful save
@@ -465,9 +471,14 @@ function FleetContent() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cars"] });
+      queryClient.invalidateQueries({ queryKey: ["available-cars"] });
       queryClient.invalidateQueries({ queryKey: ["rentals"] });
       queryClient.invalidateQueries({ queryKey: ["maintenance"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue-chart"] });
+      queryClient.invalidateQueries({ queryKey: ["tracking-cars"] });
       toast.success("تم حذف السيارة بنجاح");
       setDeleteCar(null);
     },
@@ -729,18 +740,22 @@ function FleetContent() {
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <button
-                            onClick={() => setEditCar(car)}
-                            className="p-2 text-muted hover:text-primary transition-all duration-200 rounded-lg hover:bg-primary/10"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteCar(car)}
-                            className="p-2 text-muted hover:text-danger transition-all duration-200 rounded-lg hover:bg-danger/10"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {isManager && (
+                            <>
+                              <button
+                                onClick={() => setEditCar(car)}
+                                className="p-2 text-muted hover:text-primary transition-all duration-200 rounded-lg hover:bg-primary/10"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setDeleteCar(car)}
+                                className="p-2 text-muted hover:text-danger transition-all duration-200 rounded-lg hover:bg-danger/10"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

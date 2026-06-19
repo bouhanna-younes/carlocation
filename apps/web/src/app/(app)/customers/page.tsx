@@ -395,6 +395,7 @@ export default function CustomersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("تمت إضافة العميل بنجاح");
       setAddOpen(false);
     },
@@ -411,6 +412,10 @@ export default function CustomersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["rentals"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-stats"] });
       toast.success("تم تعديل العميل بنجاح");
       setEditCustomer(null);
     },
@@ -427,6 +432,7 @@ export default function CustomersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("تم تعطيل العميل بنجاح");
     },
     onError: (err: Error) => toast.error(err.message),
@@ -455,7 +461,10 @@ export default function CustomersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
       queryClient.invalidateQueries({ queryKey: ["rentals"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue-chart"] });
       toast.success("تم حذف العميل بنجاح");
       setDeleteCustomer(null);
     },
@@ -472,6 +481,7 @@ export default function CustomersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       toast.success("تم إعادة تنشيط العميل بنجاح");
     },
     onError: (err: Error) => toast.error(err.message),
@@ -754,22 +764,26 @@ export default function CustomersPage() {
                     >
                       <Eye className="w-3 h-3" /> عرض
                     </Button>
-                    <Button
-                      onClick={() => setEditCustomer(c)}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                    >
-                      <Pencil className="w-3 h-3" /> تعديل
-                    </Button>
-                    <Button
-                      onClick={() => setDeleteCustomer(c)}
-                      variant="danger"
-                      size="sm"
-                      className="flex-1"
-                    >
-                      <Trash2 className="w-3 h-3" /> حذف
-                    </Button>
+                    {isManager && (
+                      <>
+                        <Button
+                          onClick={() => setEditCustomer(c)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          <Pencil className="w-3 h-3" /> تعديل
+                        </Button>
+                        <Button
+                          onClick={() => setDeleteCustomer(c)}
+                          variant="danger"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          <Trash2 className="w-3 h-3" /> حذف
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

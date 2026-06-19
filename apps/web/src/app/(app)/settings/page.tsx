@@ -89,7 +89,16 @@ export default function SettingsPage() {
   const [passwordError, setPasswordError] = useState("");
 
   const changePasswordMutation = useMutation({
-    mutationFn: async (data: { newPassword: string }) => {
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      // Verify current password by re-authenticating
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user?.email) throw new Error("تعذر العثور على البريد الإلكتروني");
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userData.user.email,
+        password: data.currentPassword,
+      });
+      if (signInError) throw new Error("كلمة المرور الحالية غير صحيحة");
+      // Now update the password
       const { error } = await supabase.auth.updateUser({ password: data.newPassword });
       if (error) throw new Error(error.message);
     },
@@ -114,39 +123,43 @@ export default function SettingsPage() {
     mutationFn: async (data: { newEmail: string }) => {
       const { error } = await supabase.auth.updateUser({ email: data.newEmail });
       if (error) throw new Error(error.message);
-
-      const { data: userData } = await supabase.auth.getUser();
-      if (userData?.user) {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({ email: data.newEmail } as never)
-          .eq("id", userData.user.id);
-        if (profileError) throw new Error(profileError.message);
-      }
+      // Note: Supabase sends a confirmation email to the new address.
+      // The profiles.email update happens automatically via the
+      // auth.users trigger once the user confirms the new email.
+      // Do NOT update profiles.email here — it would diverge if unconfirmed.
     },
     onSuccess: () => {
       setEmailForm({ newEmail: "" });
       setEmailError("");
-      toast.success("تم تغيير البريد الإلكتروني بنجاح");
+      toast.success("تم إرسال رابط التأكيد إلى بريدك الجديد — يرجى تأكيد التغيير");
     },
     onError: (err: Error) => toast.error(err.message),
   });
 
   const handlePasswordChange = () => {
     setPasswordError("");
+    if (!passwordForm.currentPassword) {
+      setPasswordError("كلمة المرور الحالية مطلوبة");
+      return;
+    }
     if (!passwordForm.newPassword) {
       setPasswordError("كلمة المرور الجديدة مطلوبة");
       return;
     }
-    if (passwordForm.newPassword.length < 6) {
-      setPasswordError("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordError("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setPasswordError("كلمتا المرور غير متطابقتين");
       return;
     }
+    if (passwordForm.newPassword === passwordForm.currentPassword) {
+      setPasswordError("كلمة المرور الجديدة يجب أن تكون مختلفة عن الحالية");
+      return;
+    }
     changePasswordMutation.mutate({
+      currentPassword: passwordForm.currentPassword,
       newPassword: passwordForm.newPassword,
     });
   };
@@ -354,6 +367,20 @@ export default function SettingsPage() {
                 <div>
                   <input
                     type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) =>
+                      setPasswordForm({
+                        ...passwordForm,
+                        currentPassword: e.target.value,
+                      })
+                    }
+                    className={inputClass}
+                    placeholder="كلمة المرور الحالية"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="password"
                     value={passwordForm.newPassword}
                     onChange={(e) =>
                       setPasswordForm({
@@ -362,7 +389,7 @@ export default function SettingsPage() {
                       })
                     }
                     className={inputClass}
-                    placeholder="كلمة المرور الجديدة (6 أحرف على الأقل)"
+                    placeholder="كلمة المرور الجديدة (8 أحرف على الأقل)"
                   />
                 </div>
                 <div>

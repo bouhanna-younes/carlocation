@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/supabase/database.types";
 
@@ -19,6 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const profilePromiseRef = useRef<Promise<Profile | null> | null>(null);
+  const queryClient = useQueryClient();
 
   // Centralized profile fetcher (dedupes concurrent calls)
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
@@ -53,7 +55,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
           if (!cancelled) {
-            setUser(profile);
+            if (profile) {
+              setUser(profile);
+            }
+            // If profile is null, user still has a valid session — don't force logout
+            // They just can't access app pages until profile is created
             setIsLoading(false);
           }
         } else {
@@ -97,6 +103,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw new Error(error.message);
 
       const profile = await fetchProfile(data.user.id);
+      if (!profile) {
+        throw new Error("لم يتم العثور على ملف المستخدم — تواصل مع المدير");
+      }
       setUser(profile);
       return { user: profile };
     },
@@ -106,8 +115,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
+    queryClient.clear();
     window.location.href = "/login";
-  }, []);
+  }, [queryClient]);
 
   const refreshUser = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();

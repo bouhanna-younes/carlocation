@@ -209,6 +209,29 @@ export default function ReportsPage() {
     },
   });
 
+  // Accurate KPI counts (not derived from top-N lists)
+  const { data: reportKpis } = useQuery({
+    queryKey: ["reports-kpis", selectedYear],
+    queryFn: async () => {
+      const yearStart = new Date(selectedYear, 0, 1).toISOString();
+      const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59).toISOString();
+      const [rentalsRes, customersRes] = await Promise.all([
+        supabase
+          .from("rentals")
+          .select("*", { head: true, count: "exact" })
+          .gte("created_at", yearStart)
+          .lte("created_at", yearEnd),
+        supabase
+          .from("customers")
+          .select("*", { head: true, count: "exact" }),
+      ]);
+      return {
+        totalRentals: rentalsRes.count ?? 0,
+        uniqueCustomers: customersRes.count ?? 0,
+      };
+    },
+  });
+
   if (!isManager) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in">
@@ -223,8 +246,8 @@ export default function ReportsPage() {
 
   const totalRevenue =
     monthlyRevenue?.reduce((sum, m) => sum + m.revenue, 0) ?? 0;
-  const totalRentals = topCars?.reduce((sum, c) => sum + c.rentalCount, 0) ?? 0;
-  const uniqueCustomerCount = topCustomers?.length ?? 0;
+  const totalRentals = reportKpis?.totalRentals ?? 0;
+  const uniqueCustomerCount = reportKpis?.uniqueCustomers ?? 0;
   const avgRevenuePerCustomer =
     uniqueCustomerCount > 0
       ? Math.round(totalRevenue / uniqueCustomerCount)

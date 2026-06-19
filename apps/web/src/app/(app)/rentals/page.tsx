@@ -156,13 +156,17 @@ export default function RentalsPage() {
 
   const addMutation = useMutation({
     mutationFn: async (data: RentalFormData) => {
-      // Check if customer's license expires within 30 days
+      // Check customer status (blacklist + license expiry)
       const { data: custData } = await supabase
         .from("customers")
-        .select("driver_license_expiry")
+        .select("driver_license_expiry, is_blacklisted")
         .eq("id", data.customerId)
         .single();
-      const customer = custData as { driver_license_expiry: string | null } | null;
+      const customer = custData as { driver_license_expiry: string | null; is_blacklisted: boolean | null } | null;
+
+      if (customer?.is_blacklisted) {
+        throw new Error("هذا العميل مُعطّل — لا يمكن إنشاء كراء له");
+      }
 
       if (customer?.driver_license_expiry) {
         const expiryDate = new Date(customer.driver_license_expiry);
@@ -198,10 +202,11 @@ export default function RentalsPage() {
       );
       const totalAmount = days * effectiveRate;
       const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user?.id) throw new Error("فشل التحقق من الهوية — أعد تسجيل الدخول");
       const { error } = await supabase.from("rentals").insert({
         customer_id: data.customerId,
         car_id: data.carId,
-        renter_id: userData.user?.id ?? "",
+        renter_id: userData.user.id,
         start_date: data.startDate,
         end_date: data.endDate,
         daily_rate: dailyRate,
@@ -213,10 +218,11 @@ export default function RentalsPage() {
         discount_reason: data.discountReason || null,
       } as never);
       if (error) throw new Error(error.message);
-      await supabase
+      const { error: carErr } = await supabase
         .from("cars")
         .update({ status: "rented" } as never)
         .eq("id", data.carId);
+      if (carErr) console.error("Failed to update car status:", carErr.message);
 
       // Fetch car and customer names for notification
       const { data: carRow } = await supabase
@@ -249,6 +255,11 @@ export default function RentalsPage() {
       queryClient.invalidateQueries({ queryKey: ["available-cars"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["recent-rentals"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue-chart"] });
+      queryClient.invalidateQueries({ queryKey: ["upcoming-returns"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["cars"] });
       toast.success("تم إنشاء الكراء بنجاح");
       setAddOpen(false);
     },
@@ -260,28 +271,38 @@ export default function RentalsPage() {
       const rental = rentals?.find((r) => r.id === id);
       if (!rental) throw new Error("الكراء غير موجود");
 
-      // Calculate fractional days for accurate billing
+      // Try the server-side RPC first (migration 009 — atomic, bypasses RLS)
+      const { data: rpcResult, error: rpcError } = await supabase.rpc("return_rental", {
+        p_rental_id: id,
+      });
+      if (!rpcError && rpcResult) {
+        const result = rpcResult as Record<string, unknown>;
+        if (result.success === false) {
+          throw new Error((result.error as string) || "فشل الإرجاع");
+        }
+        return;
+      }
+
+      // Fallback: client-side update (if RPC not deployed)
       const now = new Date();
       const startDate = new Date(rental.startDate);
       const elapsedMs = now.getTime() - startDate.getTime();
-      const elapsedDays = elapsedMs / 86400000;
+      const usedDays = Math.max(1, Math.ceil(elapsedMs / 86400000));
 
-      // Full days used (for billing)
-      const usedDays = Math.max(1, Math.ceil(elapsedDays));
-      const finalAmount = usedDays * rental.dailyRate;
+      // Apply discount
+      const discountPercent = rental.discountPercent ?? 0;
+      const effectiveRate = rental.dailyRate * (1 - discountPercent / 100);
+      const finalAmount = Math.round(usedDays * effectiveRate);
 
-      // 1. Update the rental
       const { error } = await supabase.from("rentals")
         .update({
           status: "completed",
           return_date: now.toISOString(),
           total_amount: finalAmount,
-          end_mileage: null,
         })
         .eq("id", id);
       if (error) throw new Error(error.message);
 
-      // 2. Update the invoice directly (fallback if DB trigger not deployed)
       const { error: invError } = await supabase
         .from("invoices")
         .update({
@@ -290,15 +311,13 @@ export default function RentalsPage() {
           total_amount: finalAmount,
         } as never)
         .eq("rental_id", id);
-      if (invError) {
-        console.error("Invoice update failed (trigger may handle it):", invError.message);
-      }
+      if (invError) console.error("Invoice update failed:", invError.message);
 
-      // 3. Set car status back to available
       if (rental?.carId) {
-        await supabase.from("cars")
+        const { error: carErr } = await supabase.from("cars")
           .update({ status: "available" } as never)
           .eq("id", rental.carId);
+        if (carErr) console.error("Car status update failed:", carErr.message);
       }
     },
     onSuccess: async () => {
@@ -308,6 +327,9 @@ export default function RentalsPage() {
       queryClient.invalidateQueries({ queryKey: ["recent-rentals"] });
       queryClient.invalidateQueries({ queryKey: ["revenue-chart"] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["upcoming-returns"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["cars"] });
 
       // Create return notification
       if (returnRental?.carId) {
@@ -338,15 +360,29 @@ export default function RentalsPage() {
       const rental = rentals?.find((r) => r.id === id);
       if (!rental) throw new Error("الكراء غير موجود");
 
-      // Calculate fractional days for accurate billing
+      // Try the server-side RPC first (migration 009 — atomic, bypasses RLS)
+      const { data: rpcResult, error: rpcError } = await supabase.rpc("cancel_rental", {
+        p_rental_id: id,
+        p_reason: reason ?? null,
+      });
+      if (!rpcError && rpcResult) {
+        const result = rpcResult as Record<string, unknown>;
+        if (result.success === false) {
+          throw new Error((result.error as string) || "فشل الإلغاء");
+        }
+        return;
+      }
+
+      // Fallback: client-side update (if RPC not deployed)
       const now = new Date();
       const startDate = new Date(rental.startDate);
       const elapsedMs = now.getTime() - startDate.getTime();
-      const elapsedDays = elapsedMs / 86400000;
+      const usedDays = Math.max(1, Math.ceil(elapsedMs / 86400000));
 
-      // Full days used (for billing) + 35% penalty
-      const usedDays = Math.max(1, Math.ceil(elapsedDays));
-      const usedAmount = usedDays * rental.dailyRate;
+      // Apply discount
+      const discountPercent = rental.discountPercent ?? 0;
+      const effectiveRate = rental.dailyRate * (1 - discountPercent / 100);
+      const usedAmount = Math.round(usedDays * effectiveRate);
       const penaltyPercent = 35;
       const penaltyAmount = Math.round(usedAmount * (penaltyPercent / 100));
       const totalAmount = usedAmount + penaltyAmount;
@@ -355,7 +391,6 @@ export default function RentalsPage() {
         ? `ملغى: ${reason} | استُخدم ${usedDays} يوم | غرامة 35%: ${penaltyAmount} DZD`
         : `استُخدم ${usedDays} يوم | غرامة 35%: ${penaltyAmount} DZD`;
 
-      // 1. Update the rental
       const { error } = await supabase.from("rentals")
         .update({
           status: "cancelled",
@@ -365,7 +400,6 @@ export default function RentalsPage() {
         .eq("id", id);
       if (error) throw new Error(error.message);
 
-      // 2. Update the invoice directly (fallback if DB trigger not deployed)
       const refundAmount = Math.max(0, (rental.depositAmount ?? 0) - penaltyAmount);
       const { error: invError } = await supabase
         .from("invoices")
@@ -379,15 +413,13 @@ export default function RentalsPage() {
           status: "cancelled",
         } as never)
         .eq("rental_id", id);
-      if (invError) {
-        console.error("Invoice cancel update failed (trigger may handle it):", invError.message);
-      }
+      if (invError) console.error("Invoice cancel update failed:", invError.message);
 
-      // 3. Set car status back to available
       if (rental?.carId) {
-        await supabase.from("cars")
+        const { error: carErr } = await supabase.from("cars")
           .update({ status: "available" } as never)
           .eq("id", rental.carId);
+        if (carErr) console.error("Car status update failed:", carErr.message);
       }
     },
     onSuccess: async () => {
@@ -396,6 +428,10 @@ export default function RentalsPage() {
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["recent-rentals"] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue-chart"] });
+      queryClient.invalidateQueries({ queryKey: ["upcoming-returns"] });
+      queryClient.invalidateQueries({ queryKey: ["customer-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["cars"] });
 
       // Create cancel notification
       if (cancelRental?.carId) {
@@ -428,6 +464,27 @@ export default function RentalsPage() {
       endDate?: string;
       notes?: string;
     }) => {
+      // Re-check overlap if dates are being changed
+      if (data.startDate || data.endDate) {
+        const rental = rentals?.find((r) => r.id === data.id);
+        const carId = rental?.carId;
+        if (carId) {
+          const newStart = data.startDate ?? rental?.startDate;
+          const newEnd = data.endDate ?? rental?.endDate;
+          const { count: overlapCount } = await supabase
+            .from("rentals")
+            .select("id", { count: "exact", head: true })
+            .eq("car_id", carId)
+            .neq("id", data.id)
+            .in("status", ["active", "overdue", "reserved"])
+            .lt("start_date", newEnd)
+            .gt("end_date", newStart);
+          if ((overlapCount ?? 0) > 0) {
+            throw new Error("التاريخ الجديد يتعارض مع كراء آخر لنفس السيارة");
+          }
+        }
+      }
+
       const update: Record<string, unknown> = {};
       if (data.startDate) update.start_date = data.startDate;
       if (data.endDate) update.end_date = data.endDate;
@@ -440,6 +497,10 @@ export default function RentalsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rentals"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["available-cars"] });
+      queryClient.invalidateQueries({ queryKey: ["upcoming-returns"] });
+      queryClient.invalidateQueries({ queryKey: ["revenue-chart"] });
       toast.success("تم تعديل الكراء بنجاح");
       setEditRental(null);
     },
@@ -1004,7 +1065,7 @@ function EditRentalForm({
     defaultValues: {
       startDate: rental.startDate.split("T")[0],
       endDate: rental.endDate.split("T")[0],
-      notes: "",
+      notes: rental.notes ?? "",
     },
   });
 
