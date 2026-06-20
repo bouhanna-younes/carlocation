@@ -37,7 +37,7 @@ export function Modal({
         <Dialog.Overlay className="fixed inset-0 z-50 glass data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content
           className={cn(
-            "fixed left-[50%] top-[50%] z-50 grid w-full translate-x-[-50%] translate-y-[-50%] gap-4 border border-border-light bg-surface p-6 shadow-xl duration-200 animate-scale-in rounded-2xl",
+            "fixed left-[50%] top-[50%] z-50 grid w-full translate-x-[-50%] translate-y-[-50%] gap-4 border border-border-light bg-surface p-6 shadow-xl duration-200 animate-scale-in rounded-2xl max-h-[90vh] overflow-hidden",
             sizeClasses[size],
             className,
           )}

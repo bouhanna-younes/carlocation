@@ -997,102 +997,105 @@ function FleetContent() {
           if (!open) setViewCar(null);
         }}
         title="تفاصيل السيارة"
+        size="lg"
       >
         {viewCar && (
-          <div className="space-y-4">
+          <div className="space-y-5 max-h-[80vh] overflow-y-auto pr-1">
             {/* Image Gallery */}
-            <ImageGallery
-              images={(carImages ?? []).map((img) => ({ id: img.id, url: img.url, caption: img.caption }))}
-              onDelete={isManager ? handleImageDelete : undefined}
-              canDelete={isManager}
-              height={240}
-            />
-            {isManager && (
-              <ImageUploader onUpload={handleImageUpload} disabled={uploadingImage} compact multiple />
-            )}
+            <div className="rounded-2xl overflow-hidden border border-border">
+              <ImageGallery
+                images={(carImages ?? []).map((img) => ({ id: img.id, url: img.url, caption: img.caption }))}
+                onDelete={isManager ? handleImageDelete : undefined}
+                canDelete={isManager}
+                height={280}
+              />
+              {isManager && (
+                <ImageUploader onUpload={handleImageUpload} disabled={uploadingImage} compact multiple />
+              )}
+            </div>
 
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <span className="text-muted">الماركة:</span>{" "}
-                <span className="font-medium">{viewCar.brand}</span>
-              </div>
-              <div>
-                <span className="text-muted">الطراز:</span>{" "}
-                <span className="font-medium">{viewCar.model}</span>
-              </div>
-              <div>
-                <span className="text-muted">السنة:</span>{" "}
-                <span className="font-medium">{viewCar.year}</span>
-              </div>
-              <div>
-                <span className="text-muted">اللوحة:</span>{" "}
-                <span className="font-mono">{viewCar.plateNumber}</span>
-              </div>
-              <div>
-                <span className="text-muted">اللون:</span>{" "}
-                <span className="font-medium">{viewCar.color}</span>
-              </div>
-              <div>
-                <span className="text-muted">الوقود:</span>{" "}
-                <span className="font-medium">{viewCar.fuelType}</span>
-              </div>
-              <div>
-                <span className="text-muted">المقاعد:</span>{" "}
-                <span className="font-medium">{viewCar.seats}</span>
-              </div>
-              <div>
-                <span className="text-muted">السعر/يوم:</span>{" "}
-                <span className="font-medium text-primary">
-                  {new Intl.NumberFormat("ar-DZ").format(viewCar.dailyRate)} DZD
-                </span>
-              </div>
-              <div>
-                <span className="text-muted">القير:</span>{" "}
-                <span className="font-medium">
-                  {viewCar.transmission === "automatic" ? "أوتوماتيكي" : "يدوي"}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted">انتهاء التأمين:</span>{" "}
-                <span className={`font-medium ${viewCar.insuranceExpiry && now15 && new Date(viewCar.insuranceExpiry) < now15 ? "text-danger" : ""}`}>
-                  {viewCar.insuranceExpiry ?? "غير محدد"}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted">انتهاء تبديل الزيت:</span>{" "}
-                <span className={`font-medium ${viewCar.oilChangeExpiry && now15 && new Date(viewCar.oilChangeExpiry) < now15 ? "text-danger" : ""}`}>
-                  {viewCar.oilChangeExpiry ?? "غير محدد"}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted">انتهاء Vignette:</span>{" "}
-                <span className={`font-medium ${viewCar.vignetteExpiry && now15 && new Date(viewCar.vignetteExpiry) < now15 ? "text-danger" : ""}`}>
-                  {viewCar.vignetteExpiry ?? "غير محدد"}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted">الفحص التقني:</span>{" "}
-                <span className={`font-medium ${viewCar.inspectionExpiry && now15 && new Date(viewCar.inspectionExpiry) < now15 ? "text-danger" : ""}`}>
-                  {viewCar.inspectionExpiry ?? "غير محدد"}
-                </span>
+            {/* Car Details */}
+            <div className="rounded-2xl border border-border p-5 bg-surface/50">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted shrink-0">الماركة:</span>
+                  <span className="font-medium truncate">{viewCar.brand}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted shrink-0">الطراز:</span>
+                  <span className="font-medium truncate">{viewCar.model}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted shrink-0">السنة:</span>
+                  <span className="font-medium">{viewCar.year}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted shrink-0">اللوحة:</span>
+                  <span className="font-mono text-xs">{viewCar.plateNumber}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted shrink-0">اللون:</span>
+                  <span className="font-medium">{viewCar.color}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted shrink-0">الوقود:</span>
+                  <span className="font-medium">{viewCar.fuelType}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted shrink-0">المقاعد:</span>
+                  <span className="font-medium">{viewCar.seats}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted shrink-0">القير:</span>
+                  <span className="font-medium">{viewCar.transmission === "automatic" ? "أوتوماتيكي" : "يدوي"}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted shrink-0">السعر/يوم:</span>
+                  <span className="font-bold text-primary">
+                    {new Intl.NumberFormat("ar-DZ").format(viewCar.dailyRate)} DZD
+                  </span>
+                </div>
               </div>
             </div>
+
+            {/* Expiry Dates */}
+            <div className="rounded-2xl border border-border p-5 bg-surface/50">
+              <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">انتهاء الصلاحية</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                {[
+                  { label: "التأمين", value: viewCar.insuranceExpiry },
+                  { label: "تبديل الزيت", value: viewCar.oilChangeExpiry },
+                  { label: "Vignette", value: viewCar.vignetteExpiry },
+                  { label: "الفحص التقني", value: viewCar.inspectionExpiry },
+                ].map((item) => {
+                  const isExpired = item.value && now15 && new Date(item.value) < now15;
+                  return (
+                    <div key={item.label} className={`rounded-xl border p-3 text-center ${isExpired ? "border-danger/50 bg-danger/5" : "border-border/50"}`}>
+                      <p className="text-xs text-muted mb-1">{item.label}</p>
+                      <p className={`text-xs font-semibold ${isExpired ? "text-danger" : "text-foreground"}`}>
+                        {item.value || "غير محدد"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Actions */}
             <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setViewCar(null);
-                  setEditCar(viewCar);
-                }}
-              >
-                تعديل
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewCar(null)}
-              >
+              {isManager && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setViewCar(null);
+                    setEditCar(viewCar);
+                  }}
+                >
+                  تعديل
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => setViewCar(null)}>
                 إغلاق
               </Button>
             </div>
