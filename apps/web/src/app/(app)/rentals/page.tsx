@@ -916,15 +916,17 @@ export default function RentalsPage() {
         )}
       </div>
 
-      <Modal open={addOpen} onOpenChange={setAddOpen} title="كراء جديد">
+      <Modal open={addOpen} onOpenChange={setAddOpen} title="كراء جديد" size="lg">
         {customers && availableCars ? (
-          <RentalForm
-            customers={customers}
-            availableCars={availableCars}
-            onSubmit={(data) => addMutation.mutate(data)}
-            onCancel={() => setAddOpen(false)}
-            isLoading={addMutation.isPending}
-          />
+          <div className="max-h-[80vh] overflow-y-auto pr-1">
+            <RentalForm
+              customers={customers}
+              availableCars={availableCars}
+              onSubmit={(data) => addMutation.mutate(data)}
+              onCancel={() => setAddOpen(false)}
+              isLoading={addMutation.isPending}
+            />
+          </div>
         ) : (
           <div className="space-y-4 py-8">
             <div className="h-10 bg-surface-hover rounded-xl animate-pulse" />
@@ -940,16 +942,19 @@ export default function RentalsPage() {
           if (!open) setReturnRental(null);
         }}
         title="إرجاع السيارة"
+        size="lg"
       >
         {returnRental && (
-          <ReturnRentalForm
-            rental={returnRental}
-            onSubmit={(formData) =>
-              returnMutation.mutate({ id: returnRental.id, formData })
-            }
-            onCancel={() => setReturnRental(null)}
-            isLoading={returnMutation.isPending}
-          />
+          <div className="max-h-[80vh] overflow-y-auto pr-1">
+            <ReturnRentalForm
+              rental={returnRental}
+              onSubmit={(formData) =>
+                returnMutation.mutate({ id: returnRental.id, formData })
+              }
+              onCancel={() => setReturnRental(null)}
+              isLoading={returnMutation.isPending}
+            />
+          </div>
         )}
       </Modal>
 
