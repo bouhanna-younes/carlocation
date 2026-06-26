@@ -55,6 +55,21 @@ export async function checkExpiryDates(): Promise<number> {
 }
 
 /**
+ * Trigger the server-side oil-change-by-mileage check RPC (migration 016).
+ * Oil is due every N km (default 10 000), not by date. This function is a
+ * manual fallback (e.g., on dashboard mount) for the daily pg_cron job.
+ * Returns the number of notifications created.
+ */
+export async function checkOilChangeMileage(): Promise<number> {
+  const { data, error } = await supabase.rpc("check_oil_change_notifications");
+  if (error) {
+    console.error("checkOilChangeMileage RPC failed:", error.message);
+    return 0;
+  }
+  return (data as number) ?? 0;
+}
+
+/**
  * Create a rental lifecycle notification (broadcast; recipient_id = NULL).
  */
 export async function createRentalNotification(

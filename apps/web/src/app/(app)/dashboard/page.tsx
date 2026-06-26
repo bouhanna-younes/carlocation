@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/client";
-import { checkExpiryDates } from "@/lib/notifications";
+import { checkExpiryDates, checkOilChangeMileage } from "@/lib/notifications";
 import { mapNotification, mapMaintenance } from "@/lib/mappers";
 import {
   Car,
@@ -231,6 +231,14 @@ export default function DashboardPage() {
     queryFn: checkExpiryDates,
     refetchInterval: 3600000, // Check every hour
     staleTime: 3600000, // Consider fresh for 1 hour
+  });
+
+  // Check oil-change by mileage on dashboard load (once per hour)
+  const { data: oilChangeCount } = useQuery({
+    queryKey: ["oil-change-mileage-check"],
+    queryFn: checkOilChangeMileage,
+    refetchInterval: 3600000,
+    staleTime: 3600000,
   });
 
   const { data: kpis, isLoading: kpisLoading } = useQuery<DashboardKPIs>({

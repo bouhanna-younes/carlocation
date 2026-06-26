@@ -59,6 +59,16 @@ const carSchema = z.object({
     .min(1, "عدد المقاعد مطلوب")
     .max(50, "الحد الأقصى 50 مقعد"),
   transmission: z.enum(["manual", "automatic"]).optional(),
+  currentMileage: z.coerce
+    .number()
+    .min(0, "المسافة يجب أن تكون موجبة")
+    .max(9999999, "المسافة مرتفعة جداً")
+    .optional(),
+  lastOilChangeKm: z.coerce
+    .number()
+    .min(0, "المسافة يجب أن تكون موجبة")
+    .max(9999999, "المسافة مرتفعة جداً")
+    .optional(),
   insuranceExpiry: z.string().optional(),
   oilChangeExpiry: z.string().optional(),
   vignetteExpiry: z.string().optional(),
@@ -94,6 +104,8 @@ function CarForm({
       fuelType: "",
       seats: 5,
       transmission: "manual",
+      currentMileage: 0,
+      lastOilChangeKm: 0,
       insuranceExpiry: "",
       oilChangeExpiry: "",
       vignetteExpiry: "",
@@ -234,6 +246,46 @@ function CarForm({
         </div>
       </div>
 
+      {/* mileage & oil change (km-based, not date-based) */}
+      <div className="rounded-xl border border-border p-4 bg-surface/50 space-y-3">
+        <p className="text-sm font-semibold text-foreground/80">الكيلومترات والزيت</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium mb-1 text-foreground/70">
+              الكيلومتر الحالي
+            </label>
+            <input
+              type="number"
+              {...register("currentMileage")}
+              className={inputClass}
+              placeholder="0"
+              dir="ltr"
+            />
+            {errors.currentMileage && (
+              <p className="text-xs text-danger mt-1">{errors.currentMileage.message}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1 text-foreground/70">
+              كم عند آخر تغيير زيت
+            </label>
+            <input
+              type="number"
+              {...register("lastOilChangeKm")}
+              className={inputClass}
+              placeholder="0"
+              dir="ltr"
+            />
+            {errors.lastOilChangeKm && (
+              <p className="text-xs text-danger mt-1">{errors.lastOilChangeKm.message}</p>
+            )}
+          </div>
+        </div>
+        <p className="text-[11px] text-muted">
+          يُنبه النظام عند اقتراب المسافة المقطوعة منذ آخر تغيير من 10 000 كم.
+        </p>
+      </div>
+
       {/* expiry dates */}
       <div className="rounded-xl border border-border p-4 bg-surface/50 space-y-3">
         <p className="text-sm font-semibold text-foreground/80">تواريخ الانتهاء</p>
@@ -243,12 +295,6 @@ function CarForm({
               انتهاء التأمين
             </label>
             <input type="date" {...register("insuranceExpiry")} className={inputClass} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium mb-1 text-foreground/70">
-              انتهاء تبديل الزيت
-            </label>
-            <input type="date" {...register("oilChangeExpiry")} className={inputClass} />
           </div>
           <div>
             <label className="block text-xs font-medium mb-1 text-foreground/70">
@@ -575,6 +621,7 @@ function FleetContent() {
       year: c.year,
       plateNumber: c.plateNumber,
       fuelType: c.fuelType,
+      currentMileage: c.currentMileage,
       dailyRate: c.dailyRate,
       status: carStatusMap[c.status]?.label ?? c.status,
     }));
@@ -586,6 +633,7 @@ function FleetContent() {
         { key: "year", label: "السنة" },
         { key: "plateNumber", label: "اللوحة" },
         { key: "fuelType", label: "الوقود" },
+        { key: "currentMileage", label: "الكيلومتر" },
         { key: "dailyRate", label: "السعر/يوم" },
         { key: "status", label: "الحالة" },
       ],
@@ -719,7 +767,7 @@ function FleetContent() {
           <table className="w-full">
             <tbody>
               {Array.from({ length: 5 }).map((_, i) => (
-                <SkeletonRow key={i} columns={8} />
+                <SkeletonRow key={i} columns={9} />
               ))}
             </tbody>
           </table>
@@ -770,6 +818,14 @@ function FleetContent() {
                     </th>
                     <th className="p-4">
                       <SortHeader
+                        label="الكيلومتر"
+                        sortKey="currentMileage"
+                        sortConfig={sortConfig}
+                        toggleSort={toggleSort}
+                      />
+                    </th>
+                    <th className="p-4">
+                      <SortHeader
                         label="السعر/يوم"
                         sortKey="dailyRate"
                         sortConfig={sortConfig}
@@ -802,6 +858,39 @@ function FleetContent() {
                         {car.plateNumber}
                       </td>
                       <td className="p-4 text-sm">{car.fuelType}</td>
+                      <td className="p-4 text-sm" dir="ltr">
+                        {(() => {
+                          const OIL_INTERVAL = 10000;
+                          const last = car.lastOilChangeKm;
+                          const km = car.currentMileage ?? 0;
+                          const isOverdue =
+                            last != null && km - last >= OIL_INTERVAL;
+                          const isDueSoon =
+                            last != null &&
+                            km - last >= OIL_INTERVAL - 500 &&
+                            !isOverdue;
+                          return (
+                            <span
+                              className={
+                                isOverdue
+                                  ? "text-danger font-semibold"
+                                  : isDueSoon
+                                    ? "text-warning font-semibold"
+                                    : ""
+                              }
+                              title={
+                                last != null
+                                  ? `${new Intl.NumberFormat("ar-DZ").format(
+                                      Math.max(km - last, 0),
+                                    )} كم منذ آخر تغيير زيت`
+                                  : "لم يُسجّل آخر تغيير زيت"
+                              }
+                            >
+                              {new Intl.NumberFormat("ar-DZ").format(km)} كم
+                            </span>
+                          );
+                        })()}
+                      </td>
                       <td className="p-4 text-sm font-medium text-primary">
                         {new Intl.NumberFormat("ar-DZ").format(car.dailyRate)}{" "}
                         DZD
@@ -875,6 +964,29 @@ function FleetContent() {
                       DZD/يوم
                     </span>
                   </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted">
+                      الكيلومتر:{" "}
+                      <span className="font-medium text-foreground" dir="ltr">
+                        {new Intl.NumberFormat("ar-DZ").format(car.currentMileage ?? 0)} كم
+                      </span>
+                    </span>
+                    {(() => {
+                      const OIL_INTERVAL = 10000;
+                      const last = car.lastOilChangeKm;
+                      if (last == null) return null;
+                      const kmSince = Math.max((car.currentMileage ?? 0) - last, 0);
+                      if (kmSince >= OIL_INTERVAL)
+                        return (
+                          <span className="text-danger font-medium">تجاوز موعد الزيت</span>
+                        );
+                      if (kmSince >= OIL_INTERVAL - 500)
+                        return (
+                          <span className="text-warning font-medium">اقترب تغيير الزيت</span>
+                        );
+                      return null;
+                    })()}
+                  </div>
                   <div className="flex items-center gap-2 pt-1">
                     <button
                       onClick={() => setViewCar(car)}
@@ -943,6 +1055,8 @@ function FleetContent() {
               fuelType: editCar.fuelType,
               seats: editCar.seats,
               transmission: editCar.transmission ?? "manual",
+              currentMileage: editCar.currentMileage,
+              lastOilChangeKm: editCar.lastOilChangeKm ?? 0,
               insuranceExpiry: editCar.insuranceExpiry ?? "",
               oilChangeExpiry: editCar.oilChangeExpiry ?? "",
               vignetteExpiry: editCar.vignetteExpiry ?? "",
@@ -1058,13 +1172,87 @@ function FleetContent() {
               </div>
             </div>
 
+            {/* Mileage & Oil Change */}
+            <div className="rounded-2xl border border-border p-5 bg-surface/50">
+              <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">الكيلومترات والزيت</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl border border-border/50 p-3 text-center">
+                  <p className="text-xs text-muted mb-1">الكيلومتر الحالي</p>
+                  <p className="text-sm font-semibold">
+                    {new Intl.NumberFormat("ar-DZ").format(viewCar.currentMileage ?? 0)} كم
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/50 p-3 text-center">
+                  <p className="text-xs text-muted mb-1">عند آخر تغيير زيت</p>
+                  <p className="text-sm font-semibold">
+                    {viewCar.lastOilChangeKm != null
+                      ? `${new Intl.NumberFormat("ar-DZ").format(viewCar.lastOilChangeKm)} كم`
+                      : "غير مُسجّل"}
+                  </p>
+                </div>
+              </div>
+              {/* Oil progress bar */}
+              {(() => {
+                const OIL_INTERVAL = 10000;
+                const last = viewCar.lastOilChangeKm;
+                if (last == null) {
+                  return (
+                    <p className="text-[11px] text-muted mt-3 text-center">
+                      سجّل “كم عند آخر تغيير زيت” لتفعيل تنبيه تغيير الزيت تلقائيًا.
+                    </p>
+                  );
+                }
+                const kmSince = Math.max((viewCar.currentMileage ?? 0) - last, 0);
+                const pct = Math.min((kmSince / OIL_INTERVAL) * 100, 100);
+                const isOverdue = kmSince >= OIL_INTERVAL;
+                const isDueSoon = kmSince >= OIL_INTERVAL - 500 && !isOverdue;
+                const barColor = isOverdue
+                  ? "bg-danger"
+                  : isDueSoon
+                    ? "bg-warning"
+                    : "bg-emerald-500";
+                return (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span className="text-muted">
+                        {new Intl.NumberFormat("ar-DZ").format(kmSince)} كم منذ آخر تغيير
+                      </span>
+                      <span
+                        className={
+                          isOverdue
+                            ? "text-danger font-semibold"
+                            : isDueSoon
+                              ? "text-warning font-semibold"
+                              : "text-emerald-400 font-semibold"
+                        }
+                      >
+                        {isOverdue
+                          ? "تجاوز الموعد"
+                          : isDueSoon
+                            ? "اقتراب الموعد"
+                            : "بحالة جيدة"}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-surface-hover overflow-hidden">
+                      <div
+                        className={`h-full ${barColor} transition-all duration-500`}
+                        style={{ width: `${Math.max(pct, 2)}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted mt-1.5 text-center">
+                      الفترة المحددة: {new Intl.NumberFormat("ar-DZ").format(OIL_INTERVAL)} كم
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* Expiry Dates */}
             <div className="rounded-2xl border border-border p-5 bg-surface/50">
               <h4 className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">انتهاء الصلاحية</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 {[
                   { label: "التأمين", value: viewCar.insuranceExpiry },
-                  { label: "تبديل الزيت", value: viewCar.oilChangeExpiry },
                   { label: "Vignette", value: viewCar.vignetteExpiry },
                   { label: "الفحص التقني", value: viewCar.inspectionExpiry },
                 ].map((item) => {

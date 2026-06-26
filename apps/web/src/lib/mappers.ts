@@ -28,6 +28,8 @@ type CarInsert = {
   fuel_type: string;
   seats: number;
   transmission?: Transmission;
+  current_mileage?: number;
+  last_oil_change_km?: number | null;
   insurance_expiry?: string;
   oil_change_expiry?: string;
   vignette_expiry?: string;
@@ -144,6 +146,8 @@ export interface Car {
   fuelType: string;
   seats: number;
   transmission: Transmission;
+  currentMileage: number;
+  lastOilChangeKm?: number | null;
   insuranceExpiry?: string;
   oilChangeExpiry?: string;
   vignetteExpiry?: string;
@@ -165,6 +169,8 @@ export function mapCar(row: SupabaseCar): Car {
     fuelType: row.fuel_type,
     seats: row.seats,
     transmission: row.transmission,
+    currentMileage: row.current_mileage,
+    lastOilChangeKm: row.last_oil_change_km,
     insuranceExpiry: row.insurance_expiry ?? undefined,
     oilChangeExpiry: row.oil_change_expiry ?? undefined,
     vignetteExpiry: row.vignette_expiry ?? undefined,
@@ -186,6 +192,8 @@ export function toCarInsert(data: Partial<Car>): CarInsert {
     fuel_type: data.fuelType!,
     seats: data.seats!,
     transmission: data.transmission,
+    current_mileage: data.currentMileage,
+    last_oil_change_km: data.lastOilChangeKm,
     insurance_expiry: data.insuranceExpiry,
     oil_change_expiry: data.oilChangeExpiry,
     vignette_expiry: data.vignetteExpiry,
@@ -205,6 +213,8 @@ export function toCarUpdate(data: Partial<Car>): CarUpdate {
   if (data.fuelType !== undefined) update.fuel_type = data.fuelType;
   if (data.seats !== undefined) update.seats = data.seats;
   if (data.transmission !== undefined) update.transmission = data.transmission;
+  if (data.currentMileage !== undefined) update.current_mileage = data.currentMileage;
+  if (data.lastOilChangeKm !== undefined) update.last_oil_change_km = data.lastOilChangeKm;
   if (data.insuranceExpiry !== undefined) update.insurance_expiry = data.insuranceExpiry;
   if (data.oilChangeExpiry !== undefined) update.oil_change_expiry = data.oilChangeExpiry;
   if (data.vignetteExpiry !== undefined) update.vignette_expiry = data.vignetteExpiry;

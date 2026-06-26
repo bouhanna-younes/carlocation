@@ -5,7 +5,7 @@
  * To regenerate from a live database:
  *   npx supabase gen types --lang=typescript --project-id <project-id> > src/lib/supabase/database.types.ts
  *
- * Reflects schema after migration 007 (comprehensive security & integrity fixes).
+ * Reflects schema after migration 016 (oil-change by mileage).
  */
 
 export type Json =
@@ -86,6 +86,8 @@ export interface Database {
         fuel_type: string;
         seats: number;
         transmission: Transmission;
+        current_mileage: number;
+        last_oil_change_km: number | null;
         insurance_expiry: string | null;
         oil_change_expiry: string | null;
         vignette_expiry: string | null;
@@ -103,6 +105,8 @@ export interface Database {
         fuel_type: string;
         seats: number;
         transmission?: Transmission;
+        current_mileage?: number;
+        last_oil_change_km?: number | null;
         insurance_expiry?: string;
         oil_change_expiry?: string;
         vignette_expiry?: string;
@@ -118,6 +122,8 @@ export interface Database {
         fuel_type?: string;
         seats?: number;
         transmission?: Transmission;
+        current_mileage?: number;
+        last_oil_change_km?: number | null;
         insurance_expiry?: string;
         oil_change_expiry?: string;
         vignette_expiry?: string;
@@ -417,6 +423,10 @@ export interface Database {
         Returns: number;
       };
       check_and_create_expiry_notifications: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      check_oil_change_notifications: {
         Args: Record<string, never>;
         Returns: number;
       };
